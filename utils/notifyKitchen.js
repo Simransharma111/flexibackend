@@ -1,3 +1,6 @@
+import webpush from "web-push"; 
+import Subscription from "../models/Subscription.js";
+
 export const notifyKitchen = async (hotelId, order) => {
   const subs = await Subscription.find({ hotelId });
 
