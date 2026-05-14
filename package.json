@@ -12,8 +12,10 @@
     "jsonwebtoken": "9.0.3",
     "mongoose": "9.6.1",
     "multer": "2.1.1",
+    "nanoid": "5.1.11",
     "qrcode": "1.5.4",
     "razorpay": "2.9.6",
-    "socket.io": "4.8.3"
+    "socket.io": "4.8.3",
+    "web-push": "3.6.7"
   }
 }

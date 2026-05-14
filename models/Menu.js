@@ -26,7 +26,24 @@ const menuSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+category: {
+  type: String,
+},
 
+foodType: {
+  type: String,
+  enum: ["veg", "nonveg"],
+  default: "veg",
+},
+scheduledFor: {
+  type: Date,
+  default: null,
+},
+
+isScheduled: {
+  type: Boolean,
+  default: false,
+},
     image: String,
 
     isAvailable: {

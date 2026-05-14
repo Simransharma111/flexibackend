@@ -1,18 +1,11 @@
 import express from "express";
 
-import auth from "../middlewares/auth.js";
-import { authorizeRoles } from "../middlewares/role.js";
+import { generateQRCodes,getQRMenu} from "../controllers/qrController.js";
 
-import { createTableQR } from "../controllers/qrController.js";
 
 const router = express.Router();
 
-// owner creates QR
-router.post(
-  "/create",
-  auth,
-  authorizeRoles("owner"),
-  createTableQR
-);
-
+router.post("/generate", generateQRCodes);
+router.get("/:qrId", getQRMenu);
+// router.post("/assign", assignQR);
 export default router;

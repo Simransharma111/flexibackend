@@ -1,7 +1,7 @@
 import express from "express";
 import auth from "../middlewares/auth.js";
 import { authorizeRoles } from "../middlewares/role.js";
-import { createTable, getTables } from "../controllers/tableController.js";
+import { createTable, getTables,assignQRToTable } from "../controllers/tableController.js";
 
 const router = express.Router();
 
@@ -17,6 +17,12 @@ router.get(
   auth,
   authorizeRoles("owner"),
   getTables
+);
+router.put(
+  "/assign-qr",
+  auth,
+  authorizeRoles("owner"),
+  assignQRToTable
 );
 
 export default router;

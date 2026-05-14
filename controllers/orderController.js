@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import Order from "../models/Order.js";
 import Menu from "../models/Menu.js";
 import Table from "../models/Table.js";
-
+import { notifyKitchen } from "../utils/notifyKitchen.js";
 
 // ===============================
 // CREATE ORDER
@@ -110,7 +110,7 @@ export const createOrder = async (req, res) => {
       message: "Order placed successfully",
       order,
     });
-
+await notifyKitchen(req.user.hotelId, order);
   } catch (err) {
 
     console.error("CREATE ORDER ERROR:", err);

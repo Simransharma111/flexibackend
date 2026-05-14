@@ -34,6 +34,7 @@ router.put(
   "/dish/:id",
   auth,
   authorizeRoles("owner"),
+  upload.single("image"),
   updateDish
 );
 

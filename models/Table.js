@@ -7,12 +7,21 @@ const tableSchema = new mongoose.Schema(
       ref: "Hotel",
     },
 
+    type: {
+      type: String,
+      enum: ["room", "table"],
+      required: true,
+    },
+
     tableNumber: {
       type: String,
       required: true,
     },
 
-    qrCode: String,
+    qrId: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true }
 );
