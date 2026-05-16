@@ -9,15 +9,28 @@ const orderSchema = new mongoose.Schema(
       required: true,
     },
 
-    // TABLE / ROOM
+    // TABLE / ROOM REFERENCE
     table: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Table",
     },
 
+    // KEEP THIS FOR BACKWARD COMPATIBILITY
     roomNumber: {
       type: String,
       required: true,
+    },
+
+    // NEW CLEAN FIELD
+    locationNumber: {
+      type: String,
+    },
+
+    // OPTIONAL
+    locationType: {
+      type: String,
+      enum: ["table", "room"],
+      default: "table",
     },
 
     // GUEST
@@ -60,6 +73,11 @@ const orderSchema = new mongoose.Schema(
       default: 0,
     },
 
+    discountAmount: {
+      type: Number,
+      default: 0,
+    },
+
     totalAmount: {
       type: Number,
       required: true,
@@ -68,16 +86,23 @@ const orderSchema = new mongoose.Schema(
     // PAYMENT
     paymentStatus: {
       type: String,
-      enum: [
-        "pending",
-        "paid",
-      ],
+      enum: ["pending", "paid"],
       default: "pending",
+    },
+
+    paymentMethod: {
+      type: String,
+      enum: ["cash", "online", "card"],
+      default: "cash",
     },
 
     billGenerated: {
       type: Boolean,
       default: false,
+    },
+
+    billNumber: {
+      type: String,
     },
 
     // ESTIMATION
@@ -101,6 +126,10 @@ const orderSchema = new mongoose.Schema(
     },
 
     deliveredAt: Date,
+
+    cancelledAt: Date,
+
+    cancellationReason: String,
   },
   {
     timestamps: true,
