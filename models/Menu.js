@@ -35,6 +35,20 @@ foodType: {
   enum: ["veg", "nonveg"],
   default: "veg",
 },
+isAvailable: {
+  type: Boolean,
+  default: true,
+},
+
+isRecommended: {
+  type: Boolean,
+  default: false,
+},
+
+isBestseller: {
+  type: Boolean,
+  default: false,
+},
 scheduledFor: {
   type: Date,
   default: null,

@@ -96,7 +96,11 @@ export const trackOrder = async (req, res) => {
       });
     }
 
-    const order = await Order.findById(id);
+   const orders = await Order.find({
+  hotel: req.user.hotelId,
+})
+.populate("table")
+.sort({ createdAt: -1 });
 
     if (!order) {
       return res.status(404).json({

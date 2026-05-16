@@ -28,6 +28,7 @@ export const createCategory = async (req, res) => {
 
 export const addDish = async (req, res) => {
   try {
+
     const {
       name,
       description,
@@ -35,38 +36,73 @@ export const addDish = async (req, res) => {
       prepTime,
       category,
       scheduledFor,
+      foodType,
+
+      isAvailable,
+      isRecommended,
+      isBestseller,
+
     } = req.body;
 
     let imageUrl = null;
 
-    // ✅ IF IMAGE UPLOADED
+    // IMAGE UPLOAD
     if (req.file) {
-      const result = await uploadToCloudinary(req.file.buffer, "menu");
+
+      const result =
+        await uploadToCloudinary(
+          req.file.buffer,
+          "menu"
+        );
+
       imageUrl = result.secure_url;
     }
 
-    // fallback image
+    // FALLBACK IMAGE
     if (!imageUrl) {
+
       imageUrl =
         "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
     }
 
     const dish = await Menu.create({
+
       hotelId: req.user.hotelId,
+
       category,
       name,
       description,
       price,
       prepTime,
+      foodType,
+
       scheduledFor,
       isScheduled: !!scheduledFor,
+
       image: imageUrl,
+
+      // NEW FLAGS
+      isAvailable:
+        isAvailable === "true",
+
+      isRecommended:
+        isRecommended === "true",
+
+      isBestseller:
+        isBestseller === "true",
+
     });
 
     res.status(201).json(dish);
+
   } catch (err) {
+
     console.log(err);
-    res.status(500).json({ message: err.message });
+
+    res.status(500).json({
+      message: err.message,
+    });
+
   }
 };
 export const getHotelMenu = async (req, res) => {
@@ -99,31 +135,60 @@ export const getHotelMenu = async (req, res) => {
 // UPDATE DISH
 export const updateDish = async (req, res) => {
   try {
-    const dish = await Menu.findById(req.params.id);
+
+    const dish = await Menu.findById(
+      req.params.id
+    );
 
     if (!dish) {
-      return res.status(404).json({ message: "Dish not found" });
+
+      return res.status(404).json({
+        message: "Dish not found",
+      });
     }
 
     let updatedData = {
       ...req.body,
+
+      // BOOLEAN FIX
+      isAvailable:
+        req.body.isAvailable === "true",
+
+      isRecommended:
+        req.body.isRecommended === "true",
+
+      isBestseller:
+        req.body.isBestseller === "true",
     };
 
-    // ✅ IF NEW IMAGE UPLOADED
+    // IMAGE UPLOAD
     if (req.file) {
-      const result = await uploadToCloudinary(req.file.buffer, "menu");
-      updatedData.image = result.secure_url;
+
+      const result =
+        await uploadToCloudinary(
+          req.file.buffer,
+          "menu"
+        );
+
+      updatedData.image =
+        result.secure_url;
     }
 
-    const updatedDish = await Menu.findByIdAndUpdate(
-      req.params.id,
-      updatedData,
-      { new: true }
-    );
+    const updatedDish =
+      await Menu.findByIdAndUpdate(
+        req.params.id,
+        updatedData,
+        { new: true }
+      );
 
     res.json(updatedDish);
+
   } catch (err) {
-    res.status(500).json({ message: err.message });
+
+    res.status(500).json({
+      message: err.message,
+    });
+
   }
 };
 

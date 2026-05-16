@@ -5,5 +5,5 @@ import auth from "../middlewares/auth.js";
 const router = express.Router();
 
 router.post("/subscribe", auth, saveSubscription);
-router.get("/push/vapid", getVapidKey);
+router.get("/vapid", getVapidKey);
 export default router;
