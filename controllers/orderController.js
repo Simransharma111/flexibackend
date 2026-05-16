@@ -105,6 +105,11 @@ const order =
         roomNumber:
           table.tableNumber,
 
+          
+        locationNumber: table.tableNumber,
+        locationType: table.type,
+
+
         guestName:
           guestName || "Guest",
 
