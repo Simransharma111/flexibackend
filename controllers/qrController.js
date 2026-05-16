@@ -86,3 +86,103 @@ export const getQRMenu = async (req, res) => {
     });
   }
 };
+// DISABLE QR
+export const toggleQRStatus = async (req, res) => {
+  try {
+
+    const { qrId } = req.params;
+
+    const qr = await QR.findOne({ qrId });
+
+    if (!qr) {
+      return res.status(404).json({
+        message: "QR not found",
+      });
+    }
+
+    qr.isActive = !qr.isActive;
+
+    await qr.save();
+
+    res.json({
+      success: true,
+      message: qr.isActive
+        ? "QR Enabled"
+        : "QR Disabled",
+      qr,
+    });
+
+  } catch (err) {
+
+    console.log(err);
+
+    res.status(500).json({
+      message: "Server error",
+    });
+
+  }
+};
+export const reassignQR = async (req, res) => {
+  try {
+
+    const {
+      qrId,
+      newTableId,
+    } = req.body;
+
+    const qr = await QR.findOne({ qrId });
+
+    if (!qr) {
+      return res.status(404).json({
+        message: "QR not found",
+      });
+    }
+
+    const table = await Table.findById(
+      newTableId
+    );
+
+    if (!table) {
+      return res.status(404).json({
+        message: "Table not found",
+      });
+    }
+
+    // REMOVE OLD TABLE QR
+    await Table.findByIdAndUpdate(
+      qr.tableId,
+      {
+        qrId: null,
+      }
+    );
+
+    // UPDATE QR
+    qr.tableId = table._id;
+
+    qr.tableNumber =
+      table.tableNumber;
+
+    qr.hotelId = table.hotelId;
+
+    await qr.save();
+
+    // UPDATE NEW TABLE
+    table.qrId = qr.qrId;
+
+    await table.save();
+
+    res.json({
+      success: true,
+      message: "QR reassigned",
+    });
+
+  } catch (err) {
+
+    console.log(err);
+
+    res.status(500).json({
+      message: "Server error",
+    });
+
+  }
+};
