@@ -186,3 +186,56 @@ export const reassignQR = async (req, res) => {
 
   }
 };
+export const removeQRAssignment = async (req, res) => {
+  try {
+    const { tableId } = req.body;
+
+    if (!tableId) {
+      return res.status(400).json({
+        success: false,
+        message: "tableId is required",
+      });
+    }
+
+    // find table
+    const table = await Table.findById(tableId);
+
+    if (!table) {
+      return res.status(404).json({
+        success: false,
+        message: "Table not found",
+      });
+    }
+
+    const oldQrId = table.qrId;
+
+    // 1. remove from TABLE
+    table.qrId = null;
+    await table.save();
+
+    // 2. free QR in QR collection (IMPORTANT)
+    if (oldQrId) {
+      await QR.findOneAndUpdate(
+        { qrId: oldQrId },
+        {
+          assigned: false,
+          tableId: null,
+          tableNumber: null,
+        }
+      );
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "QR assignment removed successfully",
+    });
+
+  } catch (err) {
+    console.error("REMOVE QR ERROR:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};

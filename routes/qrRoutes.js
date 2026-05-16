@@ -1,6 +1,6 @@
 import express from "express";
 
-import { generateQRCodes,getQRMenu,toggleQRStatus,reassignQR} from "../controllers/qrController.js";
+import { generateQRCodes,getQRMenu,toggleQRStatus,reassignQR,removeQRAssignment} from "../controllers/qrController.js";
 import auth from "../middlewares/auth.js";
 
 
@@ -19,5 +19,6 @@ router.put(
   auth,
   reassignQR
 );
+router.put("/remove-qr", removeQRAssignment);
 // router.post("/assign", assignQR);
 export default router;
