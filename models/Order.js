@@ -2,15 +2,31 @@ import mongoose from "mongoose";
 
 const orderSchema = new mongoose.Schema(
   {
+    // HOTEL
     hotelId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Hotel",
+      required: true,
     },
 
-    roomNumber: String,
+    // TABLE / ROOM
+    table: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Table",
+    },
 
-    guestName: String,
+    roomNumber: {
+      type: String,
+      required: true,
+    },
 
+    // GUEST
+    guestName: {
+      type: String,
+      default: "Guest",
+    },
+
+    // ITEMS
     items: [
       {
         menuId: {
@@ -23,30 +39,75 @@ const orderSchema = new mongoose.Schema(
         quantity: Number,
 
         price: Number,
+
+        total: Number,
       },
     ],
 
-    totalAmount: Number,
+    // BILLING
+    subtotal: {
+      type: Number,
+      default: 0,
+    },
 
+    gstAmount: {
+      type: Number,
+      default: 0,
+    },
+
+    serviceCharge: {
+      type: Number,
+      default: 0,
+    },
+
+    totalAmount: {
+      type: Number,
+      required: true,
+    },
+
+    // PAYMENT
+    paymentStatus: {
+      type: String,
+      enum: [
+        "pending",
+        "paid",
+      ],
+      default: "pending",
+    },
+
+    billGenerated: {
+      type: Boolean,
+      default: false,
+    },
+
+    // ESTIMATION
     estimatedTime: {
       type: Number,
       default: 20,
     },
 
- status: {
-  type: String,
-  enum: [
-    "pending",
-    "accepted",
-    "preparing",
-    "ready",
-    "delivered",
-    "cancelled",
-  ],
-  default: "pending",
-},
+    // STATUS
+    status: {
+      type: String,
+      enum: [
+        "pending",
+        "accepted",
+        "preparing",
+        "ready",
+        "delivered",
+        "cancelled",
+      ],
+      default: "pending",
+    },
+
+    deliveredAt: Date,
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
-export default mongoose.model("Order", orderSchema);
+export default mongoose.model(
+  "Order",
+  orderSchema
+);

@@ -70,16 +70,31 @@ export const createOrder = async (
         (menuItem.prepTime || 10) *
         quantity;
 
-      orderItems.push({
-        menuId: menuItem._id,
-        name: menuItem.name,
-        quantity,
-        price: menuItem.price,
-      });
+    orderItems.push({
+  menuId: menuItem._id,
+  name: menuItem.name,
+  quantity,
+  price: menuItem.price,
+  total:
+    menuItem.price * quantity,
+});
     }
 
-    const order =
-      await Order.create({
+    const subtotal = totalAmount;
+
+const gstAmount =
+  subtotal * 0.05;
+
+const serviceCharge =
+  subtotal * 0.02;
+
+const finalAmount =
+  subtotal +
+  gstAmount +
+  serviceCharge;
+
+const order =
+  await Order.create({
 
         hotelId:
           table.hotelId,
@@ -95,7 +110,10 @@ export const createOrder = async (
 
         items: orderItems,
 
-        totalAmount,
+       subtotal,
+gstAmount,
+serviceCharge,
+totalAmount: finalAmount,
 
         estimatedTime,
 
