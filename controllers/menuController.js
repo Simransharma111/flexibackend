@@ -110,26 +110,39 @@ export const getHotelMenu = async (req, res) => {
 
     const { hotelId } = req.params;
 
-    // validate id
-    if (!mongoose.Types.ObjectId.isValid(hotelId)) {
+    // VALIDATE HOTEL ID
+    if (
+      !mongoose.Types.ObjectId.isValid(
+        hotelId
+      )
+    ) {
       return res.status(400).json({
         message: "Invalid Hotel ID",
       });
     }
 
+    // GET ALL DISHES
+    // FRONTEND WILL HANDLE UI
     const dishes = await Menu.find({
       hotelId,
-      isAvailable: true,
+    }).sort({
+      isBestseller: -1,
+      isRecommended: -1,
+      createdAt: -1,
     });
 
-    res.json(dishes);
+    res.status(200).json(dishes);
 
   } catch (err) {
+
     console.error(err);
 
     res.status(500).json({
-      message: err.message,
+      message:
+        err.message ||
+        "Failed to fetch menu",
     });
+
   }
 };
 // UPDATE DISH
