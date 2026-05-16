@@ -2,7 +2,7 @@ import express from "express";
 
 import {
   createOrder,
-  trackOrder,
+  trackOrder,getOwnerOrders,
 } from "../controllers/orderController.js";
 
 const router = express.Router();
@@ -11,5 +11,10 @@ const router = express.Router();
 router.post("/", createOrder);
 
 router.get("/:id", trackOrder);
+router.get(
+  "/",
+  auth,
+  getOwnerOrders
+);
 
 export default router;
