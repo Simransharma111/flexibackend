@@ -130,50 +130,93 @@ totalAmount: finalAmount,
 
     // PUSH NOTIFICATION
   // SOCKET REALTIME UPDATE
-await notifyKitchen(
-  table.hotelId,
-  order
-);
+// SOCKET UPDATE SHOULD NEVER BREAK ORDER
+try {
 
-// FIND OWNER
-const owner =
-  await User.findOne({
+  await notifyKitchen(
+    table.hotelId,
+    order
+  );
 
-    hotelId: table.hotelId,
+} catch (err) {
 
-    role: "owner",
+  console.log(
+    "Socket notification failed",
+    err.message
+  );
 
-  });
+}
 
-// SEND FCM PUSH
-if (owner?.fcmToken) {
+// SEND PUSH TO OWNER + STAFF
+try {
 
-  await admin.messaging().send({
+  const users =
+    await User.find({
 
-    token: owner.fcmToken,
+      hotelId: table.hotelId,
 
-    notification: {
-
-      title: "New Order",
-
-      body:
-        `${guestName || "Guest"} placed an order`,
-
-    },
-
-    android: {
-
-      priority: "high",
-
-      notification: {
-
-        sound: "default",
-
+      role: {
+        $in: [
+          "owner",
+          "staff",
+        ],
       },
 
-    },
+      fcmToken: {
+        $exists: true,
+        $ne: "",
+      },
 
-  });
+    });
+
+  for (const user of users) {
+
+    try {
+
+      await admin.messaging().send({
+
+        token: user.fcmToken,
+
+        notification: {
+
+          title: "New Order",
+
+          body:
+            `${guestName || "Guest"} placed an order`,
+
+        },
+
+        android: {
+
+          priority: "high",
+
+          notification: {
+
+            sound: "default",
+
+          },
+
+        },
+
+      });
+
+    } catch (err) {
+
+      console.log(
+        "FCM failed:",
+        user.email
+      );
+
+    }
+
+  }
+
+} catch (err) {
+
+  console.log(
+    "Push notification failed",
+    err.message
+  );
 
 }
 
