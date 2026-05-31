@@ -27,6 +27,9 @@ const userSchema = new mongoose.Schema({
       type: String,
       default: "Staff",
     },
+    fcmToken: {
+  type: String,
+},
 });
 
 export default mongoose.model("User", userSchema);

@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 import Order from "../models/Order.js";
 import Menu from "../models/Menu.js";
 import Table from "../models/Table.js";
+import admin from "../utils/firebase.js";
+import User from "../models/User.js";
 
 import { notifyKitchen } from "../utils/notifyKitchen.js";
 
@@ -127,10 +129,53 @@ totalAmount: finalAmount,
       });
 
     // PUSH NOTIFICATION
-    await notifyKitchen(
-      table.hotelId,
-      order
-    );
+  // SOCKET REALTIME UPDATE
+await notifyKitchen(
+  table.hotelId,
+  order
+);
+
+// FIND OWNER
+const owner =
+  await User.findOne({
+
+    hotelId: table.hotelId,
+
+    role: "owner",
+
+  });
+
+// SEND FCM PUSH
+if (owner?.fcmToken) {
+
+  await admin.messaging().send({
+
+    token: owner.fcmToken,
+
+    notification: {
+
+      title: "New Order",
+
+      body:
+        `${guestName || "Guest"} placed an order`,
+
+    },
+
+    android: {
+
+      priority: "high",
+
+      notification: {
+
+        sound: "default",
+
+      },
+
+    },
+
+  });
+
+}
 
     return res.status(201).json({
       success: true,
