@@ -4,13 +4,27 @@ import { io } from "../server.js";
 
 // GET HOTEL ORDERS
 
-export const getHotelOrders = async (req, res) => {
+export const getHotelOrders = async (
+  req,
+  res
+) => {
 
   try {
 
+    if (!req.user?.hotelId) {
+      return res.status(403).json({
+        success: false,
+        message: "Hotel access denied",
+      });
+    }
+
     const orders = await Order.find({
+
       hotelId: req.user.hotelId,
-    }).sort({ createdAt: -1 });
+
+    }).sort({
+      createdAt: -1,
+    });
 
     res.json({
       success: true,
@@ -32,7 +46,10 @@ export const getHotelOrders = async (req, res) => {
 
 // UPDATE ORDER STATUS
 
-export const updateOrderStatus = async (req, res) => {
+export const updateOrderStatus = async (
+  req,
+  res
+) => {
 
   try {
 
@@ -40,60 +57,70 @@ export const updateOrderStatus = async (req, res) => {
 
     const { status } = req.body;
 
-    // VALIDATE ID
+    // VALIDATE ORDER ID
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-
+    if (
+      !mongoose.Types.ObjectId.isValid(
+        id
+      )
+    ) {
       return res.status(400).json({
         success: false,
         message: "Invalid Order ID",
       });
+    }
 
+    // VALIDATE HOTEL ACCESS
+
+    if (!req.user?.hotelId) {
+      return res.status(403).json({
+        success: false,
+        message: "Hotel access denied",
+      });
     }
 
     // VALIDATE STATUS
 
-   const allowedStatuses = [
-  "pending",
-  "accepted",
-  "preparing",
-  "ready",
-  "delivered",
-  "cancelled",
-];
+    const allowedStatuses = [
+      "pending",
+      "accepted",
+      "preparing",
+      "ready",
+      "delivered",
+      "cancelled",
+    ];
 
-    if (!allowedStatuses.includes(status)) {
-
+    if (
+      !allowedStatuses.includes(
+        status
+      )
+    ) {
       return res.status(400).json({
         success: false,
         message: "Invalid status",
       });
-
     }
 
-    // FIND ORDER
+    // SECURE QUERY
+    // ONLY FETCH ORDER
+    // BELONGING TO SAME HOTEL
 
-    const order = await Order.findById(id);
+    const order =
+      await Order.findOne({
+
+        _id: id,
+
+        hotelId:
+          req.user.hotelId,
+
+      });
 
     if (!order) {
 
       return res.status(404).json({
         success: false,
-        message: "Order not found",
-      });
-
-    }
-
-    // SECURITY CHECK
-
-    if (
-      order.hotelId.toString() !==
-      req.user.hotelId.toString()
-    ) {
-
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
+        message:
+          "Order not found or access denied",
       });
 
     }
@@ -106,7 +133,9 @@ export const updateOrderStatus = async (req, res) => {
 
     // REALTIME UPDATE
 
-    io.to(order._id.toString()).emit(
+    io.to(
+      order._id.toString()
+    ).emit(
       "orderUpdated",
       order
     );
@@ -116,7 +145,7 @@ export const updateOrderStatus = async (req, res) => {
       order
     );
 
-    res.json({
+    return res.json({
       success: true,
       order,
     });
@@ -125,7 +154,7 @@ export const updateOrderStatus = async (req, res) => {
 
     console.error(err);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: err.message,
     });
