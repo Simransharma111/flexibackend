@@ -5,6 +5,7 @@ import Menu from "../models/Menu.js";
 import Table from "../models/Table.js";
 import admin from "../utils/firebase.js";
 import User from "../models/User.js";
+import { io } from "../server.js";
 
 import { notifyKitchen } from "../utils/notifyKitchen.js";
 
@@ -127,7 +128,7 @@ totalAmount: finalAmount,
         status: "pending",
 
       });
-
+io.emit("newOrder", order);
 // ===============================
 // PUSH NOTIFICATION (CLEAN FCM)
 // ===============================

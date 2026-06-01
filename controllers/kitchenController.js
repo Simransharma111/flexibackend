@@ -140,10 +140,15 @@ export const updateOrderStatus = async (
       order
     );
 
-    io.emit(
-      "kitchenOrderUpdated",
-      order
-    );
+  io.emit(
+  "orderUpdated",
+  order
+);
+
+io.emit(
+  "kitchenOrderUpdated",
+  order
+);
 
     return res.json({
       success: true,
