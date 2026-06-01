@@ -128,96 +128,56 @@ totalAmount: finalAmount,
 
       });
 
-    // PUSH NOTIFICATION
-  // SOCKET REALTIME UPDATE
-// SOCKET UPDATE SHOULD NEVER BREAK ORDER
+    // ===============================
+// PUSH NOTIFICATION (SAFE VERSION)
+// ===============================
+
 try {
+  const hotelId = table.hotelId?.toString?.() || table.hotelId;
 
-  await notifyKitchen(
-    table.hotelId,
-    order
-  );
+  console.log("🔥 HOTEL ID:", hotelId);
 
-} catch (err) {
+  const users = await User.find({
+    hotelId: hotelId,
+    role: { $in: ["owner", "staff"] },
+  });
 
-  console.log(
-    "Socket notification failed",
-    err.message
-  );
+  console.log("👥 USERS FOUND:", users.length);
 
-}
-
-// SEND PUSH TO OWNER + STAFF
-try {
-
-  const users =
-    await User.find({
-
-      hotelId: table.hotelId,
-
-      role: {
-        $in: [
-          "owner",
-          "staff",
-        ],
-      },
-
-      fcmToken: {
-        $exists: true,
-        $ne: "",
-      },
-
-    });
+  if (!users.length) {
+    console.log("⚠️ No users found for notification");
+  }
 
   for (const user of users) {
-
-    try {
-
-      await admin.messaging().send({
-
-        token: user.fcmToken,
-
-        notification: {
-
-          title: "New Order",
-
-          body:
-            `${guestName || "Guest"} placed an order`,
-
-        },
-
-        android: {
-
-          priority: "high",
-
-          notification: {
-
-            sound: "default",
-
-          },
-
-        },
-
-      });
-
-    } catch (err) {
-
-      console.log(
-        "FCM failed:",
-        user.email
-      );
-
+    if (!user.fcmToken) {
+      console.log("⚠️ No FCM token for:", user.email);
+      continue;
     }
 
+    try {
+      const response = await admin.messaging().send({
+        token: user.fcmToken,
+        notification: {
+          title: "New Order",
+          body: `${guestName || "Guest"} placed an order`,
+        },
+        android: {
+          priority: "high",
+          notification: {
+            sound: "default",
+          },
+        },
+      });
+
+      console.log("✅ FCM SENT:", user.email, response);
+
+    } catch (err) {
+      console.log("❌ FCM FAILED:", user.email, err.message);
+    }
   }
 
 } catch (err) {
-
-  console.log(
-    "Push notification failed",
-    err.message
-  );
-
+  console.log("❌ PUSH NOTIFICATION BLOCK ERROR:", err.message);
 }
 
     return res.status(201).json({
