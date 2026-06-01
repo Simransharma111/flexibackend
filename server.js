@@ -18,7 +18,7 @@ import paymentRoutes from "./routes/paymentRoutes.js";
 import tableRoutes from "./routes/tableRoutes.js";
 import publicRoutes from "./routes/publicRoutes.js";
 import hotelRoutes from "./routes/hotelRoutes.js";
-import pushRoutes from "./routes/pushRoutes.js";
+// import pushRoutes from "./routes/pushRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 
 dotenv.config();
@@ -84,7 +84,7 @@ app.use("/api/kitchen", kitchenRoutes);
 app.use("/api/qr", qrRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/table",tableRoutes);
-app.use("/api/push", pushRoutes);
+// app.use("/api/push", pushRoutes);
 app.use("/api/hotel", hotelRoutes);
 app.use(
   "/api/notifications",

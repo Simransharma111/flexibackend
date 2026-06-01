@@ -1,22 +1,31 @@
-import webpush from "web-push"; 
 import Subscription from "../models/Subscription.js";
+import { io } from "../server.js"; // ADD THIS
 
 export const notifyKitchen = async (hotelId, order) => {
-  const subs = await Subscription.find({ hotelId });
+  try {
+    const users = await User.find({
+      hotelId,
+      role: { $in: ["owner", "staff"] },
+      fcmToken: { $exists: true, $ne: "" },
+    });
 
-  const payload = JSON.stringify({
-    title: "🔥 New Order Received",
-    body: `Table ${order.roomNumber} placed an order`,
-    url: "/kitchen",
-  });
+    const tokens = users.map(u => u.fcmToken);
 
-  await Promise.all(
-    subs.map(async (sub) => {
-      try {
-        await webpush.sendNotification(sub.subscription, payload);
-      } catch (err) {
-        console.log("Push failed:", err.message);
-      }
-    })
-  );
+    if (!tokens.length) return;
+
+    await admin.messaging().sendEachForMulticast({
+      tokens,
+      notification: {
+        title: "🔥 New Order",
+        body: `Table ${order.roomNumber} placed an order`,
+      },
+      data: {
+        orderId: order._id.toString(),
+        hotelId: hotelId.toString(),
+      },
+    });
+
+  } catch (err) {
+    console.log("FCM ERROR:", err.message);
+  }
 };
