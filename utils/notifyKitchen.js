@@ -1,5 +1,5 @@
 import User from "../models/User.js";
-import admin from "../config/firebase.js";
+import admin from "../utils/firebase.js";
 
 export const notifyKitchen =
   async (hotelId, order) => {
