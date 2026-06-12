@@ -91,10 +91,11 @@ const gstAmount =
 const serviceCharge =
   subtotal * 0.02;
 
-const finalAmount =
-  subtotal +
-  gstAmount +
-  serviceCharge;
+  const finalAmount = subtotal;
+// const finalAmount =
+//   subtotal +
+//   gstAmount +
+//   serviceCharge;
 
 const order =
   await Order.create({
