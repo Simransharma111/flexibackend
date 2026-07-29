@@ -29,20 +29,31 @@ export const createCategory = async (req, res) => {
 export const addDish = async (req, res) => {
   try {
 
-    const {
-      name,
-      description,
-      price,
-      prepTime,
-      category,
-      scheduledFor,
-      foodType,
+   const {
+  name,
+  description,
+  price,
+  prepTime,
+  category,
+  scheduledFor,
+  foodType,
 
-      isAvailable,
-      isRecommended,
-      isBestseller,
+  isAvailable,
+  isRecommended,
+  isBestseller,
 
-    } = req.body;
+  featured,
+  todaySpecial,
+  isPopular,
+  isNewArrival,
+  chefChoice,
+
+  spiceLevel,
+  rating,
+  displayOrder,
+
+  tags,
+} = req.body;
 
     let imageUrl = null;
 
@@ -65,33 +76,51 @@ export const addDish = async (req, res) => {
         "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
     }
 
-    const dish = await Menu.create({
+  const dish = await Menu.create({
+  hotelId: req.user.hotelId,
 
-      hotelId: req.user.hotelId,
+  category,
+  name,
+  description,
 
-      category,
-      name,
-      description,
-      price,
-      prepTime,
-      foodType,
+  price,
+  prepTime,
 
-      scheduledFor,
-      isScheduled: !!scheduledFor,
+  foodType,
 
-      image: imageUrl,
+  scheduledFor,
+  isScheduled: !!scheduledFor,
 
-      // NEW FLAGS
-      isAvailable:
-        isAvailable === "true",
+  image: imageUrl,
 
-      isRecommended:
-        isRecommended === "true",
+  isAvailable: isAvailable === "true",
 
-      isBestseller:
-        isBestseller === "true",
+  isRecommended: isRecommended === "true",
 
-    });
+  isBestseller: isBestseller === "true",
+
+  featured: featured === "true",
+
+  todaySpecial: todaySpecial === "true",
+
+  isPopular: isPopular === "true",
+
+  isNewArrival: isNewArrival === "true",
+
+  chefChoice: chefChoice === "true",
+
+  spiceLevel: spiceLevel || "",
+
+  rating: Number(rating || 0),
+
+  displayOrder: Number(displayOrder || 0),
+
+  tags: tags
+    ? Array.isArray(tags)
+      ? tags
+      : tags.split(",").map(tag => tag.trim())
+    : [],
+});
 
     res.status(201).json(dish);
 
@@ -126,10 +155,15 @@ export const getHotelMenu = async (req, res) => {
     const dishes = await Menu.find({
       hotelId,
     }).sort({
-      isBestseller: -1,
-      isRecommended: -1,
-      createdAt: -1,
-    });
+  displayOrder: 1,
+  featured: -1,
+  todaySpecial: -1,
+  isPopular: -1,
+  isBestseller: -1,
+  isRecommended: -1,
+  isNewArrival: -1,
+  createdAt: -1,
+});
 
     res.status(200).json(dishes);
 
@@ -161,18 +195,36 @@ export const updateDish = async (req, res) => {
     }
 
     let updatedData = {
-      ...req.body,
+  ...req.body,
 
-      // BOOLEAN FIX
-      isAvailable:
-        req.body.isAvailable === "true",
+  isAvailable: req.body.isAvailable === "true",
 
-      isRecommended:
-        req.body.isRecommended === "true",
+  isRecommended: req.body.isRecommended === "true",
 
-      isBestseller:
-        req.body.isBestseller === "true",
-    };
+  isBestseller: req.body.isBestseller === "true",
+
+  featured: req.body.featured === "true",
+
+  todaySpecial: req.body.todaySpecial === "true",
+
+  isPopular: req.body.isPopular === "true",
+
+  isNewArrival: req.body.isNewArrival === "true",
+
+  chefChoice: req.body.chefChoice === "true",
+
+  spiceLevel: req.body.spiceLevel || "",
+
+  rating: Number(req.body.rating || 0),
+
+  displayOrder: Number(req.body.displayOrder || 0),
+
+  tags: req.body.tags
+    ? Array.isArray(req.body.tags)
+      ? req.body.tags
+      : req.body.tags.split(",").map(tag => tag.trim())
+    : [],
+};
 
     // IMAGE UPLOAD
     if (req.file) {
@@ -238,22 +290,68 @@ export const getMenuByTable = async (req, res) => {
     const table = await Table.findById(tableId);
 
     if (!table) {
-      return res.status(404).json({ message: "Table not found" });
+      return res.status(404).json({
+        message: "Table not found",
+      });
     }
 
     const dishes = await Menu.find({
-  hotelId: table.hotelId,
-  $or: [
-    { isAvailable: true },
-    { isAvailable: { $exists: false } }
-  ]
-});
-res.status(200).json({
-  success: true,
-  table,
-  dishes,
-});
+      hotelId: table.hotelId,
+      $or: [
+        { isAvailable: true },
+        { isAvailable: { $exists: false } },
+      ],
+    }).sort({
+      displayOrder: 1,
+      featured: -1,
+      todaySpecial: -1,
+      isPopular: -1,
+      isBestseller: -1,
+      isRecommended: -1,
+      isNewArrival: -1,
+    });
+
+    const hotel = await mongoose
+      .model("Hotel")
+      .findById(table.hotelId);
+
+    res.status(200).json({
+      success: true,
+      table,
+      hotel,
+      dishes,
+    });
+
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error(err);
+
+    res.status(500).json({
+      message: err.message,
+    });
+  }
+};
+export const getFeaturedMenu = async (req, res) => {
+  try {
+    const { hotelId } = req.params;
+
+    const dishes = await Menu.find({
+      hotelId,
+      isAvailable: true,
+    });
+
+    res.json({
+      todaySpecial: dishes.filter(d => d.todaySpecial),
+      recommended: dishes.filter(d => d.isRecommended),
+      popular: dishes.filter(d => d.isPopular),
+      bestSeller: dishes.filter(d => d.isBestseller),
+      newArrival: dishes.filter(d => d.isNewArrival),
+      featured: dishes.filter(d => d.featured),
+      all: dishes,
+    });
+
+  } catch (err) {
+    res.status(500).json({
+      message: err.message,
+    });
   }
 };

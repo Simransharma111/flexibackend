@@ -5,7 +5,7 @@ import upload from "../middlewares/upload.js";
 import { getHotelMenu } from "../controllers/menuController.js";
 import {
   createCategory,
-  addDish,getMenuByTable
+  addDish,getMenuByTable,getFeaturedMenu
 } from "../controllers/menuController.js";
 import {updateDish} from "../controllers/menuController.js";
 import {deleteDish} from "../controllers/menuController.js";
@@ -43,5 +43,9 @@ router.delete(
   auth,
   authorizeRoles("owner"),
   deleteDish
+);
+router.get(
+  "/featured/:hotelId",
+  getFeaturedMenu
 );
 export default router;
