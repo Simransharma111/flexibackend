@@ -6,7 +6,7 @@ import {
   toggleQRStatus,
 } from "../controllers/qrController.js";
 
-import authMiddleware from "../middleware/authMiddleware.js";
+import authMiddleware from "../middlewares/auth.js";
 
 const router = express.Router();
 
