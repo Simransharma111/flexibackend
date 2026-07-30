@@ -320,3 +320,92 @@ export const toggleQRStatus = async (
   }
 
 };
+// =====================================================
+// REMOVE QR ASSIGNMENT
+// =====================================================
+
+export const removeQRAssignment = async (req, res) => {
+  try {
+    const { tableId } = req.body;
+
+    if (!tableId) {
+      return res.status(400).json({
+        success: false,
+        message: "tableId is required",
+      });
+    }
+
+    // ----------------------------------------
+    // FIND TABLE BELONGING TO CURRENT HOTEL
+    // ----------------------------------------
+
+    const table = await Table.findOne({
+      _id: tableId,
+      hotelId: req.user.hotelId,
+    });
+
+    if (!table) {
+      return res.status(404).json({
+        success: false,
+        message: "Table or room not found",
+      });
+    }
+
+    // ----------------------------------------
+    // IF NO QR ASSIGNED
+    // ----------------------------------------
+
+    if (!table.qrId) {
+      return res.status(400).json({
+        success: false,
+        message: "No QR is assigned to this table",
+      });
+    }
+
+    // ----------------------------------------
+    // FIND QR
+    // ----------------------------------------
+
+    const qr = await QR.findOne({
+      qrId: table.qrId,
+    });
+
+    // ----------------------------------------
+    // REMOVE QR FROM TABLE
+    // ----------------------------------------
+
+    table.qrId = null;
+
+    await table.save();
+
+    // ----------------------------------------
+    // RELEASE QR
+    // ----------------------------------------
+
+    if (qr) {
+      qr.assigned = false;
+      qr.hotelId = null;
+      qr.tableId = null;
+      qr.tableNumber = null;
+
+      await qr.save();
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "QR assignment removed successfully",
+    });
+
+  } catch (err) {
+
+    console.error(
+      "REMOVE QR ASSIGNMENT ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Failed to remove QR assignment",
+    });
+  }
+};
