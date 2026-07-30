@@ -105,12 +105,23 @@ const orderSchema = new mongoose.Schema(
       type: String,
     },
 
-    // ESTIMATION
-    estimatedTime: {
-      type: Number,
-      default: 20,
-    },
+ // ESTIMATION
+estimatedTime: {
+  type: Number,
+  default: 20,
+},
 
+// ORDER TIMING
+orderType: {
+  type: String,
+  enum: ["now", "schedule"],
+  default: "now",
+},
+
+scheduledFor: {
+  type: Date,
+  default: null,
+},
     // STATUS
     status: {
       type: String,
