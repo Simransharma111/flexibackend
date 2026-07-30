@@ -2,10 +2,12 @@ import mongoose from "mongoose";
 
 const qrSchema = new mongoose.Schema({
 
-  qrId: {
-    type: String,
-    unique: true,
-  },
+ qrId: {
+  type: String,
+  unique: true,
+  sparse: true,
+  default: null,
+},
 
   assigned: {
     type: Boolean,

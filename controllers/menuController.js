@@ -287,14 +287,35 @@ export const getMenuByTable = async (req, res) => {
   try {
     const { tableId } = req.params;
 
-    const table = await Table.findById(tableId);
+    if (!tableId) {
+      return res.status(400).json({
+        success: false,
+        message: "Table information is missing",
+      });
+    }
+
+    let table = null;
+
+    // First try MongoDB Table _id
+    if (mongoose.Types.ObjectId.isValid(tableId)) {
+      table = await Table.findById(tableId);
+    }
+
+    // If not found, treat it as QR ID
+    if (!table) {
+      table = await Table.findOne({
+        qrId: tableId,
+      });
+    }
 
     if (!table) {
       return res.status(404).json({
+        success: false,
         message: "Table not found",
       });
     }
 
+    // Get only available dishes
     const dishes = await Menu.find({
       hotelId: table.hotelId,
       $or: [
@@ -302,31 +323,22 @@ export const getMenuByTable = async (req, res) => {
         { isAvailable: { $exists: false } },
       ],
     }).sort({
-      displayOrder: 1,
-      featured: -1,
-      todaySpecial: -1,
-      isPopular: -1,
       isBestseller: -1,
       isRecommended: -1,
-      isNewArrival: -1,
+      createdAt: -1,
     });
 
-    const hotel = await mongoose
-      .model("Hotel")
-      .findById(table.hotelId);
-
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       table,
-      hotel,
       dishes,
     });
-
   } catch (err) {
-    console.error(err);
+    console.error("GET MENU BY TABLE ERROR:", err);
 
-    res.status(500).json({
-      message: err.message,
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Failed to load menu",
     });
   }
 };
