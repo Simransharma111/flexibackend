@@ -4,22 +4,47 @@ import { nanoid } from "nanoid";
 import QR from "../models/qrModel.js";
 import Table from "../models/Table.js";
 import Menu from "../models/Menu.js";
+import Hotel from "../models/Hotel.js";
+
+// =====================================================
+// GENERATE QR CODES
+// =====================================================
 
 export const generateQRCodes = async (req, res) => {
+
   try {
-    const { count } = req.body;
+
+    const count = Number(req.body.count);
+
+    if (!count || count <= 0) {
+
+      return res.status(400).json({
+        success: false,
+        message: "Valid QR count is required",
+      });
+
+    }
 
     const qrCodes = [];
 
-    for (let i = 0; i < count; i++) {
+    for (
+      let i = 0;
+      i < count;
+      i++
+    ) {
+
       const qrId = nanoid(8);
 
-      const qrUrl = `${process.env.FRONTEND_URL}/qr/${qrId}`;
+      const qrUrl =
+        `${process.env.FRONTEND_URL}/qr/${qrId}`;
 
-      const qrImage = await QRCode.toDataURL(qrUrl);
+      const qrImage =
+        await QRCode.toDataURL(qrUrl);
 
       await QR.create({
         qrId,
+        isActive: true,
+        assigned: false,
       });
 
       qrCodes.push({
@@ -27,215 +52,271 @@ export const generateQRCodes = async (req, res) => {
         qrUrl,
         qrImage,
       });
+
     }
 
-    res.json(qrCodes);
+    return res.status(201).json({
+      success: true,
+      qrCodes,
+    });
 
   } catch (error) {
-    res.status(500).json({
+
+    console.error(
+      "GENERATE QR ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
       message: error.message,
     });
+
   }
+
 };
+
+
+// =====================================================
+// GET MENU USING QR ID
+// =====================================================
 
 export const getQRMenu = async (req, res) => {
+
   try {
+
     const { qrId } = req.params;
 
-    console.log("QR ID:", qrId);
+    console.log(
+      "================================="
+    );
 
-    // FIND TABLE WITH HOTEL
-    const table = await Table.findOne({ qrId }).populate("hotelId");
+    console.log(
+      "GUEST QR REQUEST"
+    );
 
-    console.log("TABLE:", table);
+    console.log(
+      "QR ID:",
+      qrId
+    );
 
-    if (!table) {
+    // -------------------------------------------------
+    // CHECK QR
+    // -------------------------------------------------
+
+    const qr = await QR.findOne({
+      qrId,
+    });
+
+    if (!qr) {
+
+      console.log(
+        "QR NOT FOUND IN QR COLLECTION"
+      );
+
       return res.status(404).json({
-        message: "QR not assigned",
+        success: false,
+        message: "QR code not found",
       });
+
     }
 
-    // EXTRACT HOTEL
-    const hotel = table.hotelId;
+    if (qr.isActive === false) {
+
+      return res.status(403).json({
+        success: false,
+        message: "This QR code is disabled",
+      });
+
+    }
+
+    // -------------------------------------------------
+    // FIND TABLE USING QR
+    // -------------------------------------------------
+
+    const table =
+      await Table.findOne({
+        qrId,
+      });
+
+    console.log(
+      "TABLE:",
+      table
+    );
+
+    if (!table) {
+
+      return res.status(404).json({
+        success: false,
+        message:
+          "This QR code is not assigned to any table or room",
+      });
+
+    }
+
+    // -------------------------------------------------
+    // FIND HOTEL
+    // -------------------------------------------------
+
+    const hotel =
+      await Hotel.findById(
+        table.hotelId
+      );
 
     if (!hotel) {
-      return res.status(404).json({
-        message: "Hotel not found for this QR",
-      });
-    }
 
-    // GET MENU
-    const dishes = await Menu.find({
-      hotelId: hotel._id,
-      isAvailable: { $ne: false },
-    });
-
-    console.log("DISHES:", dishes.length);
-
-    return res.json({
-      hotel,     // 🔥 THIS WAS MISSING (MAIN FIX)
-      table,
-      dishes,
-    });
-
-  } catch (err) {
-    console.log("QR MENU ERROR:", err);
-
-    res.status(500).json({
-      message: err.message,
-    });
-  }
-};
-// DISABLE QR
-export const toggleQRStatus = async (req, res) => {
-  try {
-
-    const { qrId } = req.params;
-
-    const qr = await QR.findOne({ qrId });
-
-    if (!qr) {
-      return res.status(404).json({
-        message: "QR not found",
-      });
-    }
-
-    qr.isActive = !qr.isActive;
-
-    await qr.save();
-
-    res.json({
-      success: true,
-      message: qr.isActive
-        ? "QR Enabled"
-        : "QR Disabled",
-      qr,
-    });
-
-  } catch (err) {
-
-    console.log(err);
-
-    res.status(500).json({
-      message: "Server error",
-    });
-
-  }
-};
-export const reassignQR = async (req, res) => {
-  try {
-
-    const {
-      qrId,
-      newTableId,
-    } = req.body;
-
-    const qr = await QR.findOne({ qrId });
-
-    if (!qr) {
-      return res.status(404).json({
-        message: "QR not found",
-      });
-    }
-
-    const table = await Table.findById(
-      newTableId
-    );
-
-    if (!table) {
-      return res.status(404).json({
-        message: "Table not found",
-      });
-    }
-
-    // REMOVE OLD TABLE QR
-    await Table.findByIdAndUpdate(
-      qr.tableId,
-      {
-        qrId: null,
-      }
-    );
-
-    // UPDATE QR
-    qr.tableId = table._id;
-
-    qr.tableNumber =
-      table.tableNumber;
-
-    qr.hotelId = table.hotelId;
-
-    await qr.save();
-
-    // UPDATE NEW TABLE
-    table.qrId = qr.qrId;
-
-    await table.save();
-
-    res.json({
-      success: true,
-      message: "QR reassigned",
-    });
-
-  } catch (err) {
-
-    console.log(err);
-
-    res.status(500).json({
-      message: "Server error",
-    });
-
-  }
-};
-export const removeQRAssignment = async (req, res) => {
-  try {
-    const { tableId } = req.body;
-
-    if (!tableId) {
-      return res.status(400).json({
-        success: false,
-        message: "tableId is required",
-      });
-    }
-
-    // find table
-    const table = await Table.findById(tableId);
-
-    if (!table) {
       return res.status(404).json({
         success: false,
-        message: "Table not found",
+        message:
+          "Hotel not found",
       });
+
     }
 
-    const oldQrId = table.qrId;
+    // -------------------------------------------------
+    // FIND MENU
+    // -------------------------------------------------
 
-    // 1. remove from TABLE
-    table.qrId = null;
-    await table.save();
+    const dishes =
+      await Menu.find({
+        hotelId: table.hotelId,
 
-    // 2. free QR in QR collection (IMPORTANT)
-    if (oldQrId) {
-      await QR.findOneAndUpdate(
-        { qrId: oldQrId },
-        {
-          assigned: false,
-          tableId: null,
-          tableNumber: null,
-        }
-      );
-    }
+        $or: [
+          {
+            isAvailable: true,
+          },
+          {
+            isAvailable: {
+              $exists: false,
+            },
+          },
+        ],
+      })
+      .sort({
+        displayOrder: 1,
+        featured: -1,
+        todaySpecial: -1,
+        isPopular: -1,
+        isBestseller: -1,
+        isRecommended: -1,
+        isNewArrival: -1,
+        createdAt: -1,
+      });
+
+    console.log(
+      "HOTEL:",
+      hotel.name
+    );
+
+    console.log(
+      "TABLE:",
+      table.tableNumber
+    );
+
+    console.log(
+      "DISHES:",
+      dishes.length
+    );
+
+    console.log(
+      "================================="
+    );
+
+    // -------------------------------------------------
+    // RESPONSE
+    // -------------------------------------------------
 
     return res.status(200).json({
+
       success: true,
-      message: "QR assignment removed successfully",
+
+      qrId,
+
+      hotel,
+
+      table,
+
+      dishes,
+
     });
 
   } catch (err) {
-    console.error("REMOVE QR ERROR:", err);
+
+    console.error(
+      "GET QR MENU ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        err.message ||
+        "Failed to load QR menu",
+    });
+
+  }
+
+};
+
+
+// =====================================================
+// TOGGLE QR STATUS
+// =====================================================
+
+export const toggleQRStatus = async (
+  req,
+  res
+) => {
+
+  try {
+
+    const { qrId } =
+      req.params;
+
+    const qr =
+      await QR.findOne({
+        qrId,
+      });
+
+    if (!qr) {
+
+      return res.status(404).json({
+        success: false,
+        message: "QR not found",
+      });
+
+    }
+
+    qr.isActive =
+      !qr.isActive;
+
+    await qr.save();
+
+    return res.json({
+
+      success: true,
+
+      message:
+        qr.isActive
+          ? "QR Enabled"
+          : "QR Disabled",
+
+      qr,
+
+    });
+
+  } catch (err) {
+
+    console.error(
+      "TOGGLE QR ERROR:",
+      err
+    );
 
     return res.status(500).json({
       success: false,
       message: "Server error",
     });
+
   }
+
 };
