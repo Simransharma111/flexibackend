@@ -6,7 +6,8 @@ import upload from "../middlewares/upload.js";
 
 import {
   setupHotel,
-  getMyHotel
+  getMyHotel,updateHotelProfile,
+  updateHotelBranding,
 } from "../controllers/hotelController.js";
 
 const router = express.Router();
@@ -35,3 +36,24 @@ router.get(
   getMyHotel
 );
 export default router;
+router.patch(
+  "/profile",
+  auth,
+  updateHotelProfile
+);
+
+router.patch(
+  "/branding",
+  auth,
+  upload.fields([
+    {
+      name: "logo",
+      maxCount: 1,
+    },
+    {
+      name: "coverImage",
+      maxCount: 1,
+    },
+  ]),
+  updateHotelBranding
+);

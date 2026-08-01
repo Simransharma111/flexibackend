@@ -200,3 +200,131 @@ export const getMyHotel = async (req, res) => {
     });
   }
 };
+/* =========================================================
+   UPDATE HOTEL PROFILE
+========================================================= */
+
+export const updateHotelProfile = async (req, res) => {
+  try {
+    const hotel = await Hotel.findById(req.user.hotelId);
+
+    if (!hotel) {
+      return res.status(404).json({
+        success: false,
+        message: "Hotel not found",
+      });
+    }
+
+    hotel.tagline = req.body.tagline ?? hotel.tagline;
+    hotel.description = req.body.description ?? hotel.description;
+
+    hotel.address = req.body.address ?? hotel.address;
+    hotel.phone = req.body.phone ?? hotel.phone;
+    hotel.email = req.body.email ?? hotel.email;
+    hotel.website = req.body.website ?? hotel.website;
+    hotel.instagram = req.body.instagram ?? hotel.instagram;
+    hotel.whatsapp = req.body.whatsapp ?? hotel.whatsapp;
+
+    await hotel.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      hotel,
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+
+  }
+};
+/* =========================================================
+   UPDATE BRANDING
+========================================================= */
+
+export const updateHotelBranding = async (req, res) => {
+
+  try {
+
+    const hotel = await Hotel.findById(req.user.hotelId);
+
+    if (!hotel) {
+      return res.status(404).json({
+        success: false,
+        message: "Hotel not found",
+      });
+    }
+
+    let logoUrl = hotel.logo;
+    let coverUrl = hotel.coverImage;
+
+    // Logo
+
+    if (req.files?.logo?.[0]) {
+
+      const file = req.files.logo[0];
+
+      const base64 =
+        `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
+
+      const uploaded =
+        await cloudinary.uploader.upload(base64, {
+          folder: "flexiorder/hotels/logo",
+        });
+
+      logoUrl = uploaded.secure_url;
+    }
+
+    // Cover
+
+    if (req.files?.coverImage?.[0]) {
+
+      const file = req.files.coverImage[0];
+
+      const base64 =
+        `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
+
+      const uploaded =
+        await cloudinary.uploader.upload(base64, {
+          folder: "flexiorder/hotels/covers",
+        });
+
+      coverUrl = uploaded.secure_url;
+    }
+
+    hotel.logo = logoUrl;
+    hotel.coverImage = coverUrl;
+
+    hotel.theme = {
+      id: req.body.themeId || hotel.theme.id,
+      primary: req.body.themePrimary || hotel.theme.primary,
+      secondary: req.body.themeSecondary || hotel.theme.secondary,
+      accent: req.body.themeAccent || hotel.theme.accent,
+    };
+
+    await hotel.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Branding updated",
+      hotel,
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+
+  }
+
+};
