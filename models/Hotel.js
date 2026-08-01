@@ -166,10 +166,30 @@ const hotelSchema = new mongoose.Schema(
     // =========================
 
     theme: {
-      id: String,
-      primary: String,
-      secondary: String,
-      accent: String,
+      id: {
+        type: String,
+        default: "stormy_morning",
+      },
+      primary: {
+        type: String,
+        default: "#64748B",
+      },
+      secondary: {
+        type: String,
+        default: "#0F172A",
+      },
+      accent: {
+        type: String,
+        default: "#94A3B8",
+      },
+      text: {
+        type: String,
+        default: "#E6EEF8",
+      },
+      mode: {
+        type: String,
+        default: "dark",
+      },
     },
 
     // =========================

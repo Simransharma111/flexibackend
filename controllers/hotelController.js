@@ -1,6 +1,76 @@
 import Hotel from "../models/Hotel.js";
 import cloudinary from "../config/cloudinary.js";
 
+const HOTEL_THEMES = {
+  stormy_morning: {
+    id: "stormy_morning",
+    primary: "#64748B",
+    secondary: "#0F172A",
+    accent: "#94A3B8",
+    text: "#E6EEF8",
+    mode: "dark",
+  },
+  mossy_hollow: {
+    id: "mossy_hollow",
+    primary: "#4D7C0F",
+    secondary: "#1A2E05",
+    accent: "#84CC16",
+    text: "#F7FCE8",
+    mode: "dark",
+  },
+  blue_eclipse: {
+    id: "blue_eclipse",
+    primary: "#1E293B",
+    secondary: "#020617",
+    accent: "#3B82F6",
+    text: "#E6EEF8",
+    mode: "dark",
+  },
+  lush_forest: {
+    id: "lush_forest",
+    primary: "#14532D",
+    secondary: "#052E16",
+    accent: "#22C55E",
+    text: "#EAFBEC",
+    mode: "dark",
+  },
+  green_juice: {
+    id: "green_juice",
+    primary: "#16A34A",
+    secondary: "#052E16",
+    accent: "#86EFAC",
+    text: "#E9FFEF",
+    mode: "dark",
+  },
+  chili_spice: {
+    id: "chili_spice",
+    primary: "#DC2626",
+    secondary: "#1F0A0A",
+    accent: "#F97316",
+    text: "#FFF6F4",
+    mode: "dark",
+  },
+  chocolate_truffle: {
+    id: "chocolate_truffle",
+    primary: "#7C2D12",
+    secondary: "#1C0A00",
+    accent: "#D97706",
+    text: "#FFF6EC",
+    mode: "dark",
+  },
+  ink_wash: {
+    id: "ink_wash",
+    primary: "#111827",
+    secondary: "#F8FAFC",
+    accent: "#64748B",
+    text: "#0F172A",
+    mode: "light",
+  },
+};
+
+const getThemeDefinition = (id) =>
+  HOTEL_THEMES[id] || HOTEL_THEMES.stormy_morning;
+
 /* =========================================================
    SETUP HOTEL
 ========================================================= */
@@ -112,38 +182,45 @@ export const setupHotel = async (req, res) => {
 
     /* =======================================================
        THEME
-
+ 
        Matches Hotel model:
-
+ 
        theme: {
          id: String,
          primary: String,
          secondary: String,
-         accent: String
+         accent: String,
+         text: String,
+         mode: String,
        }
     ======================================================= */
-
+ 
+    const selectedThemeId =
+      req.body.themeId || hotel.theme?.id || "stormy_morning";
+    const selectedTheme = getThemeDefinition(selectedThemeId);
+ 
     hotel.theme = {
-      id:
-        req.body.themeId ||
-        hotel.theme?.id ||
-        "stormy_morning",
-
-      // accept either legacy names (themePrimary) or new names (primaryColor)
+      id: selectedThemeId,
       primary:
         req.body.themePrimary || req.body.primaryColor ||
         hotel.theme?.primary ||
-        "#64748B",
-
+        selectedTheme.primary,
       secondary:
         req.body.themeSecondary || req.body.secondaryColor ||
         hotel.theme?.secondary ||
-        "#0F172A",
-
+        selectedTheme.secondary,
       accent:
         req.body.themeAccent || req.body.accentColor ||
         hotel.theme?.accent ||
-        "#94A3B8",
+        selectedTheme.accent,
+      text:
+        req.body.themeText || req.body.text ||
+        hotel.theme?.text ||
+        selectedTheme.text,
+      mode:
+        req.body.themeMode || req.body.mode ||
+        hotel.theme?.mode ||
+        selectedTheme.mode,
     };
 
     /* =======================================================
@@ -188,9 +265,15 @@ export const getMyHotel = async (req, res) => {
       });
     }
 
+    const responseHotel = hotel.toObject();
+    responseHotel.theme = {
+      ...getThemeDefinition(responseHotel.theme?.id || "stormy_morning"),
+      ...responseHotel.theme,
+    };
+
     return res.status(200).json({
       success: true,
-      hotel,
+      hotel: responseHotel,
     });
   } catch (err) {
     console.error("GET MY HOTEL ERROR:", err);
@@ -302,12 +385,17 @@ export const updateHotelBranding = async (req, res) => {
     hotel.logo = logoUrl;
     hotel.coverImage = coverUrl;
 
+    const selectedThemeId = req.body.themeId || hotel.theme.id || "stormy_morning";
+    const selectedTheme = getThemeDefinition(selectedThemeId);
+
     // accept either legacy names (themePrimary) or new names (primaryColor)
     hotel.theme = {
-      id: req.body.themeId || hotel.theme.id,
-      primary: req.body.themePrimary || req.body.primaryColor || hotel.theme.primary,
-      secondary: req.body.themeSecondary || req.body.secondaryColor || hotel.theme.secondary,
-      accent: req.body.themeAccent || req.body.accentColor || hotel.theme.accent,
+      id: selectedThemeId,
+      primary: req.body.themePrimary || req.body.primaryColor || hotel.theme.primary || selectedTheme.primary,
+      secondary: req.body.themeSecondary || req.body.secondaryColor || hotel.theme.secondary || selectedTheme.secondary,
+      accent: req.body.themeAccent || req.body.accentColor || hotel.theme.accent || selectedTheme.accent,
+      text: req.body.themeText || req.body.text || hotel.theme.text || selectedTheme.text,
+      mode: req.body.themeMode || req.body.mode || hotel.theme.mode || selectedTheme.mode,
     };
 
     await hotel.save();
