@@ -3,63 +3,46 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
 
-
-
-
 /*
-=================================================
-SETUP PASSWORD
-=================================================
+====================================================
+LOGIN
+====================================================
 */
 
-
-export const setupPassword = async(req,res)=>{
-
+export const login = async(req,res)=>{
 
 try{
 
-
 const {
-token,
+email,
 password
 }=req.body;
 
 
-
-if(!token || !password){
-
-return res.status(400).json({
-
-message:
-"Token and password required"
-
-});
-
-}
-
-
-
-
 const user =
 await User.findOne({
-
-passwordSetupToken:token,
-
-passwordSetupExpires:{
-$gt:Date.now()
-}
-
-});
-
+email
+})
+.populate("hotelId");
 
 
 
 if(!user){
 
 return res.status(400).json({
+message:"Invalid credentials"
+});
 
-message:
-"Invalid or expired setup link"
+}
+
+
+
+
+if(!user.password){
+
+return res.status(400).json({
+
+message:"Password not created yet"
 
 });
 
@@ -68,17 +51,195 @@ message:
 
 
 
+const isMatch =
+await bcrypt.compare(
+password,
+user.password
+);
+
+
+
+if(!isMatch){
+
+return res.status(400).json({
+
+message:"Invalid credentials"
+
+});
+
+}
+
+
+
+
+
+const token =
+jwt.sign(
+
+{
+id:user._id,
+role:user.role,
+hotelId:user.hotelId?._id
+},
+
+process.env.JWT_SECRET,
+
+{
+expiresIn:"7d"
+}
+
+);
+
+
+
+
+
+res.json({
+
+token,
+
+
+// IMPORTANT
+mustChangePassword:
+user.mustChangePassword,
+
+
+
+// IMPORTANT FOR OWNER SETUP
+
+hotelSetupCompleted:
+user.hotelId?.setupCompleted || false,
+
+
+
+user:{
+
+
+id:user._id,
+
+name:user.name,
+
+email:user.email,
+
+role:user.role,
+
+hotel:user.hotelId
+
+
+}
+
+
+});
+
+
+}
+catch(err){
+
+console.log(
+"LOGIN ERROR",
+err
+);
+
+
+res.status(500).json({
+
+message:err.message
+
+});
+
+
+}
+
+
+};
+
+
+
+
+
+
+
+/*
+====================================================
+CHANGE PASSWORD
+FIRST LOGIN + NORMAL CHANGE
+====================================================
+*/
+
+
+export const changePassword =
+async(req,res)=>{
+
+
+try{
+
+
+const {
+
+userId,
+
+oldPassword,
+
+newPassword
+
+}=req.body;
+
+
+
+const user =
+await User.findById(userId);
+
+
+
+if(!user){
+
+return res.status(404).json({
+
+message:"User not found"
+
+});
+
+}
+
+
+
+
+
+const isMatch =
+await bcrypt.compare(
+oldPassword,
+user.password
+);
+
+
+
+if(!isMatch){
+
+return res.status(400).json({
+
+message:
+"Old password incorrect"
+
+});
+
+}
+
+
+
+
+
 user.password =
 await bcrypt.hash(
-password,
+newPassword,
 10
 );
 
 
 
-user.passwordSetupToken=null;
 
-user.passwordSetupExpires=null;
+// remove first login restriction
+
+user.mustChangePassword=false;
 
 
 
@@ -86,14 +247,12 @@ await user.save();
 
 
 
-
 res.json({
 
 message:
-"Password created successfully"
+"Password changed successfully"
 
 });
-
 
 
 }
@@ -101,7 +260,7 @@ catch(err){
 
 
 console.log(
-"SETUP PASSWORD ERROR",
+"CHANGE PASSWORD ERROR",
 err
 );
 
@@ -126,166 +285,56 @@ message:err.message
 
 
 /*
-=================================================
-LOGIN
-=================================================
+====================================================
+FORGOT PASSWORD
+(FUTURE EMAIL OTP READY)
+====================================================
 */
 
 
-export const login = async(req,res)=>{
+export const forgotPassword =
+async(req,res)=>{
 
 
 try{
 
 
 const {
-email,
-password
+email
 }=req.body;
-
 
 
 
 const user =
 await User.findOne({
 email
-})
-.populate("hotelId");
-
-
+});
 
 
 
 if(!user){
 
-return res.status(400).json({
+return res.status(404).json({
 
-message:
-"Invalid credentials"
-
-});
-
-}
-
-
-
-
-
-// NEW USER WITHOUT PASSWORD
-
-
-if(!user.password){
-
-
-return res.status(403).json({
-
-message:
-"Please setup your password first",
-
-setupRequired:true
+message:"User not found"
 
 });
 
-
 }
-
-
-
-
-
-
-const isMatch =
-await bcrypt.compare(
-password,
-user.password
-);
-
-
-
-
-if(!isMatch){
-
-
-return res.status(400).json({
-
-message:
-"Invalid credentials"
-
-});
-
-
-}
-
-
-
-
-
-
-
-const token =
-jwt.sign(
-
-{
-
-id:user._id,
-
-role:user.role,
-
-hotelId:user.hotelId?._id
-
-},
-
-process.env.JWT_SECRET,
-
-{
-
-expiresIn:"7d"
-
-}
-
-);
-
-
-
-
 
 
 
 res.json({
 
-token,
-
-
-user:{
-
-
-id:user._id,
-
-name:user.name,
-
-email:user.email,
-
-role:user.role,
-
-hotel:user.hotelId
-
-
-}
-
+message:
+"Password reset process started"
 
 });
 
 
 
-
 }
 catch(err){
-
-
-console.log(
-"LOGIN ERROR:",
-err
-);
 
 
 res.status(500).json({

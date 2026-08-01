@@ -1,93 +1,100 @@
 import mongoose from "mongoose";
 
+
 const userSchema = new mongoose.Schema(
-  {
+{
 
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      trim: true,
-    },
+name:{
+type:String,
+required:true,
+trim:true
+},
 
 
-    password: {
-      type: String,
-      default: null,
-    },
+email:{
+type:String,
+required:true,
+unique:true,
+lowercase:true,
+trim:true
+},
 
 
-    role: {
-      type: String,
-      enum: [
-        "superadmin",
-        "owner",
-        "staff",
-      ],
-      default: "staff",
-    },
+
+password:{
+type:String,
+default:null
+},
 
 
-    hotelId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Hotel",
-      default: null,
-    },
+
+role:{
+type:String,
+enum:[
+"superadmin",
+"owner",
+"staff"
+],
+default:"staff"
+},
 
 
-    // STAFF ROLE INFORMATION
-    position: {
-      type: String,
-      default: "Staff",
-    },
+
+hotelId:{
+type:mongoose.Schema.Types.ObjectId,
+ref:"Hotel",
+default:null
+},
 
 
-    /*
-    ==================================
-    PASSWORD SETUP SYSTEM
-    ==================================
-    */
 
-    passwordSetupToken: {
-      type: String,
-      default: null,
-    },
+position:{
+type:String,
+default:"Staff"
+},
 
 
-    passwordSetupExpires: {
-      type: Date,
-      default: null,
-    },
+
+// FORCE PASSWORD CHANGE
+
+mustChangePassword:{
+type:Boolean,
+default:false
+},
 
 
-    /*
-    ==================================
-    PUSH NOTIFICATIONS
-    ==================================
-    */
 
-    fcmToken: {
-      type: String,
-      default: null,
-    },
+// OPTIONAL SETUP LINK
+
+// passwordSetupToken:{
+// type:String,
+// default:null
+// },
 
 
-  },
-  {
-    timestamps:true,
-  }
+// passwordSetupExpires:{
+// type:Date,
+// default:null
+// },
+
+
+
+fcmToken:{
+type:String,
+default:null
+}
+
+
+},
+{
+timestamps:true
+}
+
 );
 
 
+
 export default mongoose.model(
-  "User",
-  userSchema
+"User",
+userSchema
 );

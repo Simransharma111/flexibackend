@@ -1,272 +1,215 @@
 import Hotel from "../models/Hotel.js";
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
-import crypto from "crypto";
+
+
 
 
 /*
 =========================================================
 CREATE HOTEL + OWNER
 Superadmin only
-
-Supports:
-1. Old method:
-   Superadmin gives password
-
-2. New method:
-   Owner creates password from setup link
 =========================================================
 */
 
-export const createHotelWithOwner = async (req, res) => {
 
-  try {
+export const createHotelWithOwner =
+async(req,res)=>{
 
-    const {
-      hotelName,
-      address,
-      phone,
-      ownerName,
-      ownerEmail,
-      ownerPassword
-    } = req.body;
 
+try{
 
 
-    // VALIDATION
+const {
 
-    if(
-      !hotelName ||
-      !ownerName ||
-      !ownerEmail
-    ){
+hotelName,
 
-      return res.status(400).json({
+address,
 
-        message:
-        "All required fields are needed"
+phone,
 
-      });
+ownerName,
 
-    }
+ownerEmail,
 
+ownerPassword
 
 
-    // CHECK EXISTING USER
+}=req.body;
 
-    const existingUser =
-    await User.findOne({
-      email:ownerEmail
-    });
 
 
-    if(existingUser){
+if(
+!hotelName ||
+!ownerName ||
+!ownerEmail ||
+!ownerPassword
+){
 
-      return res.status(400).json({
+return res.status(400).json({
 
-        message:
-        "Owner already exists"
+message:
+"All fields required"
 
-      });
+});
 
-    }
+}
 
 
 
-    let password = null;
 
-    let passwordSetupToken = null;
+const existingUser =
+await User.findOne({
 
-    let passwordSetupExpires = null;
+email:ownerEmail
 
+});
 
 
-    /*
-    =====================================================
-    IF SUPERADMIN PROVIDES PASSWORD
-    =====================================================
-    */
 
-    if(ownerPassword){
+if(existingUser){
 
+return res.status(400).json({
 
-      password =
-      await bcrypt.hash(
-        ownerPassword,
-        10
-      );
+message:
+"Owner already exists"
 
+});
 
-    }
+}
 
 
-    /*
-    =====================================================
-    OTHERWISE CREATE SETUP LINK
-    =====================================================
-    */
 
 
-    else{
+// HASH TEMP PASSWORD
 
 
-      passwordSetupToken =
-      crypto
-      .randomBytes(32)
-      .toString("hex");
+const hashedPassword =
+await bcrypt.hash(
+ownerPassword,
+10
+);
 
 
 
-      passwordSetupExpires =
-      Date.now()
-      +
-      24 * 60 * 60 * 1000;
 
 
-    }
 
+// CREATE OWNER
 
 
+const owner =
+await User.create({
 
-    // CREATE OWNER
+name:ownerName,
 
+email:ownerEmail,
 
-    const owner =
-    await User.create({
+password:hashedPassword,
 
-      name:ownerName,
 
-      email:ownerEmail,
+role:"owner",
 
-      password,
 
-      role:"owner",
 
-      passwordSetupToken,
+// FORCE FIRST PASSWORD CHANGE
 
-      passwordSetupExpires
+mustChangePassword:true
 
-    });
+});
 
 
 
 
 
 
-    // CREATE HOTEL
+// CREATE HOTEL
 
 
-    const hotel =
-    await Hotel.create({
+const hotel =
+await Hotel.create({
 
-      name:hotelName,
+name:hotelName,
 
-      address,
+address,
 
-      phone,
+phone,
 
-      owner:owner._id
+owner:owner._id,
 
-    });
 
+setupCompleted:false
 
 
+});
 
 
 
-    // LINK HOTEL
 
 
-    owner.hotelId =
-    hotel._id;
 
+// CONNECT OWNER WITH HOTEL
 
-    await owner.save();
 
+owner.hotelId =
+hotel._id;
 
 
+await owner.save();
 
 
 
-    // CREATE SETUP LINK ONLY IF REQUIRED
 
 
-    let setupLink = null;
 
+res.status(201).json({
 
+message:
+"Hotel created successfully",
 
-    if(passwordSetupToken){
 
 
-      setupLink =
-      `${process.env.FRONTEND_URL}/setup-password?token=${passwordSetupToken}`;
+owner:{
 
 
-    }
+name:owner.name,
 
+email:owner.email
 
+},
 
 
+temporaryPassword:
+ownerPassword,
 
 
+hotel
 
-    res.status(201).json({
+});
 
-      message:
-      "Hotel created successfully",
 
+}
+catch(err){
 
-      hotel:{
 
+console.log(
+"CREATE HOTEL ERROR",
+err
+);
 
-        id:hotel._id,
 
-        name:hotel.name
+res.status(500).json({
 
+message:err.message
 
-      },
+});
 
 
-      owner:{
+}
 
-
-        id:owner._id,
-
-        name:owner.name,
-
-        email:owner.email
-
-
-      },
-
-
-      setupLink
-
-
-    });
-
-
-
-  }
-  catch(err){
-
-
-    console.log(
-      "CREATE HOTEL ERROR:",
-      err
-    );
-
-
-    res.status(500).json({
-
-      message:err.message
-
-    });
-
-
-  }
 
 };
+
 
 
 
@@ -281,7 +224,8 @@ GET ALL HOTELS
 */
 
 
-export const getAllHotels = async(req,res)=>{
+export const getAllHotels =
+async(req,res)=>{
 
 
 try{
@@ -293,11 +237,7 @@ await Hotel.find()
 .populate(
 "owner",
 "name email"
-)
-
-.sort({
-createdAt:-1
-});
+);
 
 
 
@@ -307,9 +247,6 @@ res.json(hotels);
 
 }
 catch(err){
-
-
-console.log(err);
 
 
 res.status(500).json({
@@ -338,7 +275,8 @@ DELETE HOTEL
 */
 
 
-export const deleteHotel = async(req,res)=>{
+export const deleteHotel =
+async(req,res)=>{
 
 
 try{
