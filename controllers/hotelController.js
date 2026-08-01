@@ -129,18 +129,19 @@ export const setupHotel = async (req, res) => {
         hotel.theme?.id ||
         "stormy_morning",
 
+      // accept either legacy names (themePrimary) or new names (primaryColor)
       primary:
-        req.body.themePrimary ||
+        req.body.themePrimary || req.body.primaryColor ||
         hotel.theme?.primary ||
         "#64748B",
 
       secondary:
-        req.body.themeSecondary ||
+        req.body.themeSecondary || req.body.secondaryColor ||
         hotel.theme?.secondary ||
         "#0F172A",
 
       accent:
-        req.body.themeAccent ||
+        req.body.themeAccent || req.body.accentColor ||
         hotel.theme?.accent ||
         "#94A3B8",
     };
@@ -301,11 +302,12 @@ export const updateHotelBranding = async (req, res) => {
     hotel.logo = logoUrl;
     hotel.coverImage = coverUrl;
 
+    // accept either legacy names (themePrimary) or new names (primaryColor)
     hotel.theme = {
       id: req.body.themeId || hotel.theme.id,
-      primary: req.body.themePrimary || hotel.theme.primary,
-      secondary: req.body.themeSecondary || hotel.theme.secondary,
-      accent: req.body.themeAccent || hotel.theme.accent,
+      primary: req.body.themePrimary || req.body.primaryColor || hotel.theme.primary,
+      secondary: req.body.themeSecondary || req.body.secondaryColor || hotel.theme.secondary,
+      accent: req.body.themeAccent || req.body.accentColor || hotel.theme.accent,
     };
 
     await hotel.save();
