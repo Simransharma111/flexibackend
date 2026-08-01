@@ -6,6 +6,7 @@ changePassword,
 forgotPassword
 }
 from "../controllers/authController.js";
+import auth from "../middlewares/auth.js";
 
 
 const router =
@@ -21,6 +22,7 @@ login
 
 router.post(
 "/change-password",
+auth,
 changePassword
 );
 
