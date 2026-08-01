@@ -3,20 +3,19 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
 
-/*
-====================================================
-LOGIN
-====================================================
-*/
 
-export const login = async(req,res)=>{
+export const login =
+async(req,res)=>{
+
 
 try{
+
 
 const {
 email,
 password
 }=req.body;
+
 
 
 const user =
@@ -38,20 +37,7 @@ message:"Invalid credentials"
 
 
 
-if(!user.password){
-
-return res.status(400).json({
-
-message:"Password not created yet"
-
-});
-
-}
-
-
-
-
-const isMatch =
+const match =
 await bcrypt.compare(
 password,
 user.password
@@ -59,12 +45,10 @@ user.password
 
 
 
-if(!isMatch){
+if(!match){
 
 return res.status(400).json({
-
 message:"Invalid credentials"
-
 });
 
 }
@@ -99,21 +83,15 @@ res.json({
 token,
 
 
-// IMPORTANT
 mustChangePassword:
 user.mustChangePassword,
 
-
-
-// IMPORTANT FOR OWNER SETUP
 
 hotelSetupCompleted:
 user.hotelId?.setupCompleted || false,
 
 
-
 user:{
-
 
 id:user._id,
 
@@ -125,7 +103,6 @@ role:user.role,
 
 hotel:user.hotelId
 
-
 }
 
 
@@ -135,16 +112,11 @@ hotel:user.hotelId
 }
 catch(err){
 
-console.log(
-"LOGIN ERROR",
-err
-);
+console.log(err);
 
 
 res.status(500).json({
-
 message:err.message
-
 });
 
 
@@ -159,44 +131,33 @@ message:err.message
 
 
 
-/*
-====================================================
-CHANGE PASSWORD
-FIRST LOGIN + NORMAL CHANGE
-====================================================
-*/
 
+// CHANGE PASSWORD
 
 export const changePassword =
 async(req,res)=>{
-
 
 try{
 
 
 const {
-
-userId,
-
 oldPassword,
-
 newPassword
-
 }=req.body;
 
 
 
 const user =
-await User.findById(userId);
+await User.findById(
+req.user.id
+);
 
 
 
 if(!user){
 
 return res.status(404).json({
-
 message:"User not found"
-
 });
 
 }
@@ -204,8 +165,7 @@ message:"User not found"
 
 
 
-
-const isMatch =
+const match =
 await bcrypt.compare(
 oldPassword,
 user.password
@@ -213,17 +173,13 @@ user.password
 
 
 
-if(!isMatch){
+if(!match){
 
 return res.status(400).json({
-
-message:
-"Old password incorrect"
-
+message:"Old password incorrect"
 });
 
 }
-
 
 
 
@@ -236,11 +192,7 @@ newPassword,
 
 
 
-
-// remove first login restriction
-
 user.mustChangePassword=false;
-
 
 
 await user.save();
@@ -250,7 +202,11 @@ await user.save();
 res.json({
 
 message:
-"Password changed successfully"
+"Password changed successfully",
+
+
+hotelSetupCompleted:
+user.hotelId?.setupCompleted || false
 
 });
 
@@ -258,22 +214,12 @@ message:
 }
 catch(err){
 
-
-console.log(
-"CHANGE PASSWORD ERROR",
-err
-);
-
-
 res.status(500).json({
-
 message:err.message
-
 });
 
 
 }
-
 
 };
 
@@ -283,68 +229,16 @@ message:err.message
 
 
 
-
-/*
-====================================================
-FORGOT PASSWORD
-(FUTURE EMAIL OTP READY)
-====================================================
-*/
-
-
 export const forgotPassword =
 async(req,res)=>{
-
-
-try{
-
-
-const {
-email
-}=req.body;
-
-
-
-const user =
-await User.findOne({
-email
-});
-
-
-
-if(!user){
-
-return res.status(404).json({
-
-message:"User not found"
-
-});
-
-}
-
 
 
 res.json({
 
 message:
-"Password reset process started"
+"Forgot password system coming soon"
 
 });
-
-
-
-}
-catch(err){
-
-
-res.status(500).json({
-
-message:err.message
-
-});
-
-
-}
 
 
 };
