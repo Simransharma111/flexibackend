@@ -1,6 +1,7 @@
 import express from "express";
 
 import {
+register,
 login,
 changePassword,
 forgotPassword
@@ -12,6 +13,12 @@ import auth from "../middlewares/auth.js";
 const router =
 express.Router();
 
+
+
+router.post(
+"/register",
+register
+);
 
 
 router.post(

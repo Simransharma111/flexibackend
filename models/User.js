@@ -54,6 +54,23 @@ default:"Staff"
 },
 
 
+accountStatus:{
+type:String,
+default:"pending"
+},
+
+
+subscriptionPlan:{
+type:String,
+default:"trial"
+},
+
+
+createdBy:{
+type:String,
+default:"self"
+},
+
 
 // FORCE PASSWORD CHANGE
 
