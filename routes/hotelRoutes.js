@@ -35,7 +35,6 @@ router.get(
   auth,
   getMyHotel
 );
-export default router;
 router.patch(
   "/profile",
   auth,
@@ -57,3 +56,4 @@ router.patch(
   ]),
   updateHotelBranding
 );
+export default router;
