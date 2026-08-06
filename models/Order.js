@@ -1,153 +1,356 @@
 import mongoose from "mongoose";
 
+
 const orderSchema = new mongoose.Schema(
-  {
-    // HOTEL
-    hotelId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Hotel",
-      required: true,
-    },
 
-    // TABLE / ROOM REFERENCE
-    table: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Table",
-    },
+{
+  // HOTEL
+  hotelId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Hotel",
+    required: true,
+  },
 
-    // KEEP THIS FOR BACKWARD COMPATIBILITY
-    roomNumber: {
-      type: String,
-      required: true,
-    },
 
-    // NEW CLEAN FIELD
-    locationNumber: {
-      type: String,
-    },
+  // TABLE REFERENCE
+  table: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Table",
+  },
 
-    // OPTIONAL
-    locationType: {
-      type: String,
-      enum: ["table", "room"],
-      default: "table",
-    },
 
-    // GUEST
-    guestName: {
-      type: String,
-      default: "Guest",
-    },
+  // BACKWARD COMPATIBILITY
+  roomNumber: {
+    type: String,
+    required: true,
+  },
 
-    // ITEMS
-    items: [
-      {
-        menuId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Menu",
-        },
 
-        name: String,
+  // TABLE / ROOM NUMBER
+  locationNumber: {
+    type: String,
+  },
 
-        quantity: Number,
 
-        price: Number,
+  locationType: {
+    type: String,
+    enum: [
+      "table",
+      "room"
+    ],
+    default: "table",
+  },
 
-        total: Number,
+
+
+  // GUEST DETAILS
+  guestName: {
+    type: String,
+    default: "Guest",
+  },
+
+
+
+  // ORDER ITEMS
+  items: [
+
+    {
+
+      menuId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Menu",
       },
+
+
+      name: {
+        type:String,
+      },
+
+
+      quantity: {
+        type:Number,
+        default:1,
+      },
+
+
+      price:{
+        type:Number,
+        default:0,
+      },
+
+
+      total:{
+        type:Number,
+        default:0,
+      }
+
+    }
+
+  ],
+
+
+
+
+
+  // BILLING
+
+  subtotal:{
+    type:Number,
+    default:0,
+  },
+
+
+  gstAmount:{
+    type:Number,
+    default:0,
+  },
+
+
+  serviceCharge:{
+    type:Number,
+    default:0,
+  },
+
+
+  discountAmount:{
+    type:Number,
+    default:0,
+  },
+
+
+  totalAmount:{
+    type:Number,
+    required:true,
+  },
+
+
+
+
+
+  // PAYMENT
+
+  paymentStatus:{
+    type:String,
+
+    enum:[
+      "pending",
+      "paid"
     ],
 
-    // BILLING
-    subtotal: {
-      type: Number,
-      default: 0,
-    },
-
-    gstAmount: {
-      type: Number,
-      default: 0,
-    },
-
-    serviceCharge: {
-      type: Number,
-      default: 0,
-    },
-
-    discountAmount: {
-      type: Number,
-      default: 0,
-    },
-
-    totalAmount: {
-      type: Number,
-      required: true,
-    },
-
-    // PAYMENT
-    paymentStatus: {
-      type: String,
-      enum: ["pending", "paid"],
-      default: "pending",
-    },
-
-    paymentMethod: {
-      type: String,
-      enum: ["cash", "online", "card"],
-      default: "cash",
-    },
-
-    billGenerated: {
-      type: Boolean,
-      default: false,
-    },
-
-    billNumber: {
-      type: String,
-    },
-
- // ESTIMATION
-estimatedTime: {
-  type: Number,
-  default: 20,
-},
-
-// ORDER TIMING
-orderType: {
-  type: String,
-  enum: ["now", "schedule"],
-  default: "now",
-},
-
-scheduledFor: {
-  type: Date,
-  default: null,
-},
-    // STATUS
-    status: {
-      type: String,
-      enum: [
-        "pending",
-        "accepted",
-        "preparing",
-        "ready",
-        "delivered",
-        "cancelled",
-      ],
-      default: "pending",
-    },
-
-    deliveredAt: Date,
-
-    cancelledAt: Date,
-
-    cancellationReason: String,
+    default:"pending",
   },
-  {
-    timestamps: true,
-  }
+
+
+  paymentMethod:{
+    type:String,
+
+    enum:[
+      "cash",
+      "online",
+      "card"
+    ],
+
+    default:"cash",
+  },
+
+
+
+  billGenerated:{
+    type:Boolean,
+    default:false,
+  },
+
+
+  billNumber:{
+    type:String,
+  },
+
+
+
+
+
+
+
+  // ORDER ESTIMATION
+
+  estimatedTime:{
+    type:Number,
+    default:20,
+  },
+
+
+
+
+
+
+  // ORDER TYPE
+
+  orderType:{
+
+    type:String,
+
+    enum:[
+      "now",
+      "schedule"
+    ],
+
+    default:"now",
+
+  },
+
+
+  scheduledFor:{
+    type:Date,
+    default:null,
+  },
+
+
+
+
+
+
+
+
+
+  // ===============================
+  // KITCHEN STATUS MANAGEMENT
+  // ===============================
+
+
+  status:{
+
+    type:String,
+
+    enum:[
+
+      "pending",
+
+      "accepted",
+
+      "preparing",
+
+      "ready",
+
+      "delivered",
+
+      "paused",
+
+      "cancelled"
+
+    ],
+
+
+    default:"pending",
+
+  },
+
+
+
+
+  // Used when order is paused
+  // Example:
+  // preparing -> paused -> preparing
+
+  previousStatus:{
+
+    type:String,
+
+    default:null,
+
+  },
+
+
+
+
+
+  pauseReason:{
+
+    type:String,
+
+    default:null,
+
+  },
+
+
+
+
+
+
+
+
+  // STATUS HISTORY
+
+  statusHistory:[
+
+    {
+
+      status:{
+
+        type:String,
+
+      },
+
+
+      changedBy:{
+
+        type:mongoose.Schema.Types.ObjectId,
+
+        ref:"User",
+
+      },
+
+
+      note:String,
+
+
+      changedAt:{
+
+        type:Date,
+
+        default:Date.now,
+
+      }
+
+    }
+
+  ],
+
+
+
+
+
+
+
+  // COMPLETION
+
+  deliveredAt:{
+    type:Date,
+  },
+
+
+
+  cancelledAt:{
+    type:Date,
+  },
+
+
+  cancellationReason:{
+    type:String,
+  },
+
+
+},
+
+
+{
+  timestamps:true,
+}
+
 );
 
+
+
 export default mongoose.model(
-  "Order",
-  orderSchema
+"Order",
+orderSchema
 );
