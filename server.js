@@ -21,6 +21,7 @@ import tableRoutes from "./routes/tableRoutes.js";
 import publicRoutes from "./routes/publicRoutes.js";
 import hotelRoutes from "./routes/hotelRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
+import categoryRoutes from "./routes/categoryRoutes.js";
 
 dotenv.config();
 
@@ -190,6 +191,12 @@ app.use(
  menuRoutes
 );
 
+
+
+app.use(
+"/api/categories",
+categoryRoutes
+);
 
 app.use(
  "/api/public",
