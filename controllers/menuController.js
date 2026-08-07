@@ -1,4 +1,4 @@
-import Category from "../models/Category.js";
+import MenuCategory from "../models/MenuCategory.js";
 import Menu from "../models/Menu.js";
 import cloudinary from "../config/cloudinary.js";
 import mongoose from "mongoose";
@@ -6,364 +6,958 @@ import Table from "../models/Table.js";
 import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
 
 // CREATE CATEGORY
-export const createCategory = async (req, res) => {
-  try {
-    const category = await Category.create({
-      name: req.body.name,
-      hotelId: req.user.hotelId,
-    });
 
-    res.status(201).json(category);
-  } catch (err) {
-    console.error(err);
+export const createCategory = async(req,res)=>{
 
-    res.status(500).json({
-      message: err.message,
-    });
-  }
+try{
+
+const {
+name
+}=req.body;
+
+
+if(!name){
+
+return res.status(400).json({
+message:"Category name required"
+});
+
+}
+
+
+const exists =
+await MenuCategory.findOne({
+
+hotelId:req.user.hotelId,
+name:name.trim()
+
+});
+
+
+if(exists){
+
+return res.status(400).json({
+message:"Category already exists"
+});
+
+}
+
+
+
+const category =
+await MenuCategory.create({
+
+hotelId:req.user.hotelId,
+
+name:name.trim()
+
+});
+
+
+res.status(201).json(category);
+
+
+}
+catch(error){
+
+res.status(500).json({
+
+message:error.message
+
+});
+
+}
+
+};
+
+
+
+// ================================
+// GET CATEGORIES
+// ================================
+
+export const getCategories = async(req,res)=>{
+
+try{
+
+
+const categories =
+await MenuCategory.find({
+
+hotelId:req.params.hotelId,
+
+isActive:true
+
+})
+.sort({
+
+displayOrder:1
+
+});
+
+
+
+res.json(categories);
+
+
+}
+catch(error){
+
+res.status(500).json({
+
+message:error.message
+
+});
+
+}
+
+};
+
+
+
+// ================================
+// UPDATE CATEGORY
+// ================================
+
+
+export const updateCategory = async(req,res)=>{
+
+try{
+
+
+const category =
+await MenuCategory.findByIdAndUpdate(
+
+req.params.id,
+
+{
+name:req.body.name
+},
+
+{
+new:true
+}
+
+);
+
+
+
+res.json(category);
+
+
+}
+catch(error){
+
+res.status(500).json({
+
+message:error.message
+
+});
+
+}
+
+};
+
+
+
+// ================================
+// DELETE CATEGORY
+// ================================
+
+
+export const deleteCategory = async(req,res)=>{
+
+try{
+
+
+await MenuCategory.findByIdAndUpdate(
+
+req.params.id,
+
+{
+isActive:false
+}
+
+);
+
+
+
+res.json({
+
+message:"Category disabled"
+
+});
+
+
+}
+catch(error){
+
+res.status(500).json({
+
+message:error.message
+
+});
+
+}
+
 };
 
 // ADD DISH
 
 
-export const addDish = async (req, res) => {
-  try {
+export const addDish = async(req,res)=>{
 
-   const {
-  name,
-  description,
-  price,
-  prepTime,
-  category,
-  scheduledFor,
-  foodType,
+try{
 
-  isAvailable,
-  isRecommended,
-  isBestseller,
 
-  featured,
-  todaySpecial,
-  isPopular,
-  isNewArrival,
-  chefChoice,
+const {
 
-  spiceLevel,
-  rating,
-  displayOrder,
+categoryId,
 
-  tags,
-} = req.body;
+subCategory,
 
-    let imageUrl = null;
+name,
 
-    // IMAGE UPLOAD
-    if (req.file) {
+description,
 
-      const result =
-        await uploadToCloudinary(
-          req.file.buffer,
-          "menu"
-        );
+price,
 
-      imageUrl = result.secure_url;
-    }
+prepTime,
 
-    // FALLBACK IMAGE
-    if (!imageUrl) {
+foodType,
 
-      imageUrl =
-        "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
-    }
+isAvailable,
 
-  const dish = await Menu.create({
-  hotelId: req.user.hotelId,
+featured,
 
-  category,
-  name,
-  description,
+todaySpecial,
 
-  price,
-  prepTime,
+isRecommended,
 
-  foodType,
+isBestseller,
 
-  scheduledFor,
-  isScheduled: !!scheduledFor,
+isPopular,
 
-  image: imageUrl,
+isNewArrival,
 
-  isAvailable: isAvailable === "true",
+chefChoice,
 
-  isRecommended: isRecommended === "true",
+spiceLevel,
 
-  isBestseller: isBestseller === "true",
+tags,
 
-  featured: featured === "true",
+scheduledFor
 
-  todaySpecial: todaySpecial === "true",
 
-  isPopular: isPopular === "true",
+}=req.body;
 
-  isNewArrival: isNewArrival === "true",
 
-  chefChoice: chefChoice === "true",
 
-  spiceLevel: spiceLevel || "",
+// CATEGORY CHECK
 
-  rating: Number(rating || 0),
+const category =
+await MenuCategory.findOne({
 
-  displayOrder: Number(displayOrder || 0),
+_id:categoryId,
 
-  tags: tags
-    ? Array.isArray(tags)
-      ? tags
-      : tags.split(",").map(tag => tag.trim())
-    : [],
+hotelId:req.user.hotelId
+
 });
 
-    res.status(201).json(dish);
 
-  } catch (err) {
+if(!category){
 
-    console.log(err);
+return res.status(400).json({
 
-    res.status(500).json({
-      message: err.message,
-    });
+message:"Invalid category"
 
-  }
+});
+
+}
+
+
+
+
+// IMAGE
+
+let image="";
+
+
+if(req.file){
+
+const result =
+await uploadToCloudinary(
+
+req.file.buffer,
+
+"menu"
+
+);
+
+
+image=result.secure_url;
+
+}
+
+
+
+// CREATE DISH
+
+
+const dish =
+await Menu.create({
+
+hotelId:req.user.hotelId,
+
+
+categoryId,
+
+
+subCategory:
+subCategory || "",
+
+
+name,
+
+
+description,
+
+
+price:Number(price),
+
+
+prepTime:
+Number(prepTime || 15),
+
+
+
+foodType:
+foodType || "veg",
+
+
+
+image,
+
+
+
+isAvailable:
+req.body.isAvailable === true ||
+req.body.isAvailable === "true",
+
+
+
+isAvailable:
+req.body.isAvailable === true ||
+req.body.isAvailable === "true",
+
+
+
+isAvailable:
+req.body.isAvailable === true ||
+req.body.isAvailable === "true",
+
+
+isAvailable:
+req.body.isAvailable === true ||
+req.body.isAvailable === "true",
+
+
+
+isAvailable:
+req.body.isAvailable === true ||
+req.body.isAvailable === "true",
+
+
+
+isAvailable:
+req.body.isAvailable === true ||
+req.body.isAvailable === "true",
+
+
+
+isAvailable:
+req.body.isAvailable === true ||
+req.body.isAvailable === "true",
+
+
+
+chefChoice:
+req.body.chefChoice === true ||
+req.body.chefChoice === "true",
+
+
+
+spiceLevel:
+spiceLevel || "",
+
+
+
+tags:
+tags
+?
+(
+Array.isArray(tags)
+?
+tags
+:
+tags.split(",")
+.map(t=>t.trim())
+)
+:
+[],
+
+
+
+isScheduled:
+!!scheduledFor,
+
+
+scheduledFor:
+scheduledFor || null
+
+
+
+});
+
+
+
+const populatedDish =
+await dish.populate(
+"categoryId"
+);
+
+
+
+res.status(201).json(
+populatedDish
+);
+
+
+}
+
+catch(error){
+
+console.log(error);
+
+
+res.status(500).json({
+
+message:error.message
+
+});
+
+}
+
+
 };
-export const getHotelMenu = async (req, res) => {
-  try {
+export const getHotelMenu = async(req,res)=>{
 
-    const { hotelId } = req.params;
+try{
 
-    // VALIDATE HOTEL ID
-    if (
-      !mongoose.Types.ObjectId.isValid(
-        hotelId
-      )
-    ) {
-      return res.status(400).json({
-        message: "Invalid Hotel ID",
-      });
-    }
 
-    // GET ALL DISHES
-    // FRONTEND WILL HANDLE UI
-    const dishes = await Menu.find({
-      hotelId,
-    }).sort({
-  displayOrder: 1,
-  featured: -1,
-  todaySpecial: -1,
-  isPopular: -1,
-  isBestseller: -1,
-  isRecommended: -1,
-  isNewArrival: -1,
-  createdAt: -1,
+const {hotelId}=req.params;
+
+
+
+if(
+!mongoose.Types.ObjectId.isValid(hotelId)
+){
+
+return res.status(400).json({
+
+message:"Invalid Hotel ID"
+
 });
 
-    res.status(200).json(dishes);
+}
 
-  } catch (err) {
 
-    console.error(err);
 
-    res.status(500).json({
-      message:
-        err.message ||
-        "Failed to fetch menu",
-    });
+// GET MENU
 
-  }
+const dishes = await Menu.find({
+
+hotelId,
+
+
+})
+
+.populate({
+
+path:"categoryId",
+
+select:"name displayOrder isActive"
+
+})
+
+
+.sort({
+
+displayOrder:1,
+
+createdAt:-1
+
+});
+
+
+
+res.status(200).json(
+dishes
+);
+
+
+
+}
+catch(error){
+
+console.log(
+"GET MENU ERROR:",
+error
+);
+
+
+
+res.status(500).json({
+
+message:error.message
+
+});
+
+
+}
+
+
 };
 // UPDATE DISH
-export const updateDish = async (req, res) => {
-  try {
+export const updateDish = async(req,res)=>{
 
-    const dish = await Menu.findById(
-      req.params.id
-    );
+try{
 
-    if (!dish) {
 
-      return res.status(404).json({
-        message: "Dish not found",
-      });
-    }
+const dish =
+await Menu.findById(
+req.params.id
+);
 
-    let updatedData = {
-  ...req.body,
 
-  isAvailable: req.body.isAvailable === "true",
 
-  isRecommended: req.body.isRecommended === "true",
+if(!dish){
 
-  isBestseller: req.body.isBestseller === "true",
+return res.status(404).json({
 
-  featured: req.body.featured === "true",
+message:"Dish not found"
 
-  todaySpecial: req.body.todaySpecial === "true",
+});
 
-  isPopular: req.body.isPopular === "true",
+}
 
-  isNewArrival: req.body.isNewArrival === "true",
 
-  chefChoice: req.body.chefChoice === "true",
 
-  spiceLevel: req.body.spiceLevel || "",
+// CATEGORY CHANGE CHECK
 
-  rating: Number(req.body.rating || 0),
+if(req.body.categoryId){
 
-  displayOrder: Number(req.body.displayOrder || 0),
 
-  tags: req.body.tags
-    ? Array.isArray(req.body.tags)
-      ? req.body.tags
-      : req.body.tags.split(",").map(tag => tag.trim())
-    : [],
+const category =
+await MenuCategory.findOne({
+
+_id:req.body.categoryId,
+
+hotelId:req.user.hotelId
+
+});
+
+
+if(!category){
+
+return res.status(400).json({
+
+message:"Invalid category"
+
+});
+
+}
+
+
+}
+
+
+
+
+const updateData={
+
+...req.body,
+
+
+price:
+Number(req.body.price),
+
+
+prepTime:
+Number(req.body.prepTime || 15),
+
+
+
+isAvailable:
+req.body.isAvailable==="true",
+
+
+featured:
+req.body.featured==="true",
+
+
+todaySpecial:
+req.body.todaySpecial==="true",
+
+
+isRecommended:
+req.body.isRecommended==="true",
+
+
+isBestseller:
+req.body.isBestseller==="true",
+
+
+isPopular:
+req.body.isPopular==="true",
+
+
+isNewArrival:
+req.body.isNewArrival==="true",
+
+
+chefChoice:
+req.body.chefChoice==="true",
+
+
+
+tags:
+req.body.tags
+?
+(
+Array.isArray(req.body.tags)
+?
+req.body.tags
+:
+req.body.tags.split(",")
+.map(t=>t.trim())
+)
+:
+[]
+
+
+
 };
 
-    // IMAGE UPLOAD
-    if (req.file) {
 
-      const result =
-        await uploadToCloudinary(
-          req.file.buffer,
-          "menu"
-        );
 
-      updatedData.image =
-        result.secure_url;
-    }
 
-    const updatedDish =
-      await Menu.findByIdAndUpdate(
-        req.params.id,
-        updatedData,
-        { new: true }
-      );
+// IMAGE UPDATE
 
-    res.json(updatedDish);
+if(req.file){
 
-  } catch (err) {
 
-    res.status(500).json({
-      message: err.message,
-    });
+const result =
+await uploadToCloudinary(
 
-  }
+req.file.buffer,
+
+"menu"
+
+);
+
+
+updateData.image =
+result.secure_url;
+
+
+}
+
+
+
+
+const updatedDish =
+
+await Menu.findByIdAndUpdate(
+
+req.params.id,
+
+updateData,
+
+{
+new:true
+}
+
+).populate(
+"categoryId"
+);
+
+
+
+res.json(
+updatedDish
+);
+
+
+
+}
+catch(error){
+
+
+console.log(error);
+
+
+res.status(500).json({
+
+message:error.message
+
+});
+
+
+}
+
+
 };
 
 // DELETE DISH
 
-export const deleteDish =
-  async (req, res) => {
+export const deleteDish = async(req,res)=>{
 
-    try {
+try{
 
-      await Menu.findByIdAndDelete(
-        req.params.id
-      );
 
-      res.json({
-        message:
-          "Dish deleted",
-      });
+const dish =
+await Menu.findByIdAndUpdate(
 
-    } catch (err) {
+req.params.id,
 
-      res.status(500).json({
-        message: err.message,
-      });
+{
+isDeleted:true,
+isAvailable:false
+},
 
-    }
+{
+new:true
+}
+
+);
+
+
+
+if(!dish){
+
+return res.status(404).json({
+
+message:"Dish not found"
+
+});
+
+}
+
+
+
+res.json({
+
+message:"Dish moved to deleted",
+
+dish
+
+});
+
+
+}
+catch(error){
+
+res.status(500).json({
+
+message:error.message
+
+});
+
+}
+
 };
 
 
-export const getMenuByTable = async (req, res) => {
-  try {
-    const { tableId } = req.params;
+export const getMenuByTable = async(req,res)=>{
 
-    if (!tableId) {
-      return res.status(400).json({
-        success: false,
-        message: "Table information is missing",
-      });
-    }
+try{
 
-    let table = null;
 
-    // First try MongoDB Table _id
-    if (mongoose.Types.ObjectId.isValid(tableId)) {
-      table = await Table.findById(tableId);
-    }
+const {tableId}=req.params;
 
-    // If not found, treat it as QR ID
-    if (!table) {
-      table = await Table.findOne({
-        qrId: tableId,
-      });
-    }
 
-    if (!table) {
-      return res.status(404).json({
-        success: false,
-        message: "Table not found",
-      });
-    }
+let table=null;
 
-    // Get only available dishes
-    const dishes = await Menu.find({
-      hotelId: table.hotelId,
-      $or: [
-        { isAvailable: true },
-        { isAvailable: { $exists: false } },
-      ],
-    }).sort({
-      isBestseller: -1,
-      isRecommended: -1,
-      createdAt: -1,
-    });
 
-    return res.status(200).json({
-      success: true,
-      table,
-      dishes,
-    });
-  } catch (err) {
-    console.error("GET MENU BY TABLE ERROR:", err);
 
-    return res.status(500).json({
-      success: false,
-      message: err.message || "Failed to load menu",
-    });
-  }
+if(
+mongoose.Types.ObjectId.isValid(tableId)
+){
+
+table =
+await Table.findById(tableId);
+
+}
+
+
+
+if(!table){
+
+table =
+await Table.findOne({
+qrId:tableId
+});
+
+}
+
+
+
+if(!table){
+
+return res.status(404).json({
+
+message:"Table not found"
+
+});
+
+}
+
+
+
+const dishes = await Menu.find({
+
+hotelId:table.hotelId,
+
+isAvailable:true,
+
+isDeleted:false
+
+})
+
+
+.populate({
+
+path:"categoryId",
+
+select:"name"
+
+})
+
+
+.sort({
+
+displayOrder:1,
+
+createdAt:-1
+
+});
+
+
+
+
+res.json({
+
+success:true,
+
+table,
+
+dishes
+
+});
+
+
+}
+catch(error){
+
+res.status(500).json({
+
+message:error.message
+
+});
+
+}
+
 };
-export const getFeaturedMenu = async (req, res) => {
-  try {
-    const { hotelId } = req.params;
+export const getFeaturedMenu = async(req,res)=>{
 
-    const dishes = await Menu.find({
-      hotelId,
-      isAvailable: true,
-    });
+try{
 
-    res.json({
-      todaySpecial: dishes.filter(d => d.todaySpecial),
-      recommended: dishes.filter(d => d.isRecommended),
-      popular: dishes.filter(d => d.isPopular),
-      bestSeller: dishes.filter(d => d.isBestseller),
-      newArrival: dishes.filter(d => d.isNewArrival),
-      featured: dishes.filter(d => d.featured),
-      all: dishes,
-    });
 
-  } catch (err) {
-    res.status(500).json({
-      message: err.message,
-    });
-  }
+const dishes =
+await Menu.find({
+
+hotelId:req.params.hotelId,
+
+isAvailable:true,
+
+isDeleted:false
+
+})
+
+
+.populate({
+
+path:"categoryId",
+
+select:"name"
+
+});
+
+
+
+res.json({
+
+todaySpecial:
+dishes.filter(
+d=>d.todaySpecial
+),
+
+
+recommended:
+dishes.filter(
+d=>d.isRecommended
+),
+
+
+popular:
+dishes.filter(
+d=>d.isPopular
+),
+
+
+bestSeller:
+dishes.filter(
+d=>d.isBestseller
+),
+
+
+newArrival:
+dishes.filter(
+d=>d.isNewArrival
+),
+
+
+featured:
+dishes.filter(
+d=>d.featured
+),
+
+
+all:dishes
+
+});
+
+
+}
+catch(error){
+
+res.status(500).json({
+
+message:error.message
+
+});
+
+}
+
 };
