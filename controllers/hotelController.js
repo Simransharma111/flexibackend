@@ -1,4 +1,5 @@
 import Hotel from "../models/Hotel.js";
+import User from "../models/User.js";
 import cloudinary from "../config/cloudinary.js";
 
 const HOTEL_THEMES = {
@@ -71,75 +72,143 @@ const HOTEL_THEMES = {
 const getThemeDefinition = (id) =>
   HOTEL_THEMES[id] || HOTEL_THEMES.stormy_morning;
 
+
 /* =========================================================
    SETUP HOTEL
-========================================================= */
+   ========================================================= */
 
 export const setupHotel = async (req, res) => {
   try {
-    /* =======================================================
-       FIND CURRENT OWNER'S HOTEL
-    ======================================================= */
+    const user = await User.findById(req.user.id);
 
-    const hotel = await Hotel.findById(req.user.hotelId);
-
-    if (!hotel) {
+    if (!user) {
       return res.status(404).json({
         success: false,
-        message: "Hotel not found",
+        message: "User not found",
       });
     }
 
-    /* =======================================================
-       KEEP OLD IMAGES IF NO NEW IMAGE IS UPLOADED
-    ======================================================= */
+    if (user.role !== "owner") {
+      return res.status(403).json({
+        success: false,
+        message: "Only hotel owners can setup a hotel",
+      });
+    }
+
+    /*
+    =========================================================
+    FIND EXISTING HOTEL OR PREPARE NEW HOTEL
+    =========================================================
+    */
+
+    let hotel = null;
+
+    // Admin-created owner already has a hotel
+    if (user.hotelId) {
+      hotel = await Hotel.findById(user.hotelId);
+
+      if (!hotel) {
+        return res.status(404).json({
+          success: false,
+          message: "Assigned hotel not found",
+        });
+      }
+
+      // Safety: make sure this hotel actually belongs to this owner
+      if (
+        hotel.owner &&
+        hotel.owner.toString() !== user._id.toString()
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "You are not authorized to setup this hotel",
+        });
+      }
+    }
+
+    /*
+    =========================================================
+    SELF-REGISTERED OWNER
+    No hotelId yet → create a new hotel
+    =========================================================
+    */
+
+    if (!hotel) {
+      hotel = new Hotel({
+        owner: user._id,
+        setupCompleted: false,
+        isActive: true,
+      });
+    }
+
+    /*
+    =========================================================
+    KEEP OLD IMAGES IF NO NEW IMAGE IS UPLOADED
+    =========================================================
+    */
 
     let logoUrl = hotel.logo || "";
     let coverUrl = hotel.coverImage || "";
 
-    /* =======================================================
-       LOGO UPLOAD
-    ======================================================= */
+    /*
+    =========================================================
+    LOGO UPLOAD
+    =========================================================
+    */
 
     if (req.files?.logo?.[0]) {
       const logoFile = req.files.logo[0];
 
-      const logoBase64 = `data:${logoFile.mimetype};base64,${logoFile.buffer.toString(
-        "base64"
-      )}`;
+      const logoBase64 =
+        `data:${logoFile.mimetype};base64,${logoFile.buffer.toString(
+          "base64"
+        )}`;
 
       const uploadedLogo =
-        await cloudinary.uploader.upload(logoBase64, {
-          folder: "flexiorder/hotels/logo",
-        });
+        await cloudinary.uploader.upload(
+          logoBase64,
+          {
+            folder: "flexiorder/hotels/logo",
+          }
+        );
 
       logoUrl = uploadedLogo.secure_url;
     }
 
-    /* =======================================================
-       COVER IMAGE UPLOAD
-    ======================================================= */
+    /*
+    =========================================================
+    COVER IMAGE UPLOAD
+    =========================================================
+    */
 
     if (req.files?.coverImage?.[0]) {
       const coverFile = req.files.coverImage[0];
 
-      const coverBase64 = `data:${coverFile.mimetype};base64,${coverFile.buffer.toString(
-        "base64"
-      )}`;
+      const coverBase64 =
+        `data:${coverFile.mimetype};base64,${coverFile.buffer.toString(
+          "base64"
+        )}`;
 
       const uploadedCover =
-        await cloudinary.uploader.upload(coverBase64, {
-          folder: "flexiorder/hotels/covers",
-        });
+        await cloudinary.uploader.upload(
+          coverBase64,
+          {
+            folder: "flexiorder/hotels/covers",
+          }
+        );
 
       coverUrl = uploadedCover.secure_url;
     }
 
-    /* =======================================================
-       UPDATE BASIC INFORMATION
-    ======================================================= */
+    /*
+    =========================================================
+    BASIC INFORMATION
+    =========================================================
+    */
 
-    hotel.name = req.body.name || hotel.name;
+    if (req.body.name !== undefined) {
+      hotel.name = req.body.name;
+    }
 
     hotel.tagline =
       req.body.tagline ?? hotel.tagline;
@@ -147,12 +216,15 @@ export const setupHotel = async (req, res) => {
     hotel.description =
       req.body.description ?? hotel.description;
 
-    hotel.type =
-      req.body.type || hotel.type;
+    if (req.body.type !== undefined) {
+      hotel.type = req.body.type;
+    }
 
-    /* =======================================================
-       CONTACT INFORMATION
-    ======================================================= */
+    /*
+    =========================================================
+    CONTACT INFORMATION
+    =========================================================
+    */
 
     hotel.address =
       req.body.address ?? hotel.address;
@@ -172,80 +244,131 @@ export const setupHotel = async (req, res) => {
     hotel.whatsapp =
       req.body.whatsapp ?? hotel.whatsapp;
 
-    /* =======================================================
-       IMAGES
-    ======================================================= */
+    /*
+    =========================================================
+    IMAGES
+    =========================================================
+    */
 
     hotel.logo = logoUrl;
-
     hotel.coverImage = coverUrl;
 
-    /* =======================================================
-       THEME
- 
-       Matches Hotel model:
- 
-       theme: {
-         id: String,
-         primary: String,
-         secondary: String,
-         accent: String,
-         text: String,
-         mode: String,
-       }
-    ======================================================= */
- 
+    /*
+    =========================================================
+    THEME
+    =========================================================
+    */
+
     const selectedThemeId =
-      req.body.themeId || hotel.theme?.id || "stormy_morning";
-    const selectedTheme = getThemeDefinition(selectedThemeId);
- 
+      req.body.themeId ||
+      hotel.theme?.id ||
+      "stormy_morning";
+
+    const selectedTheme =
+      getThemeDefinition(selectedThemeId);
+
     hotel.theme = {
       id: selectedThemeId,
+
       primary:
-        req.body.themePrimary || req.body.primaryColor ||
+        req.body.themePrimary ||
+        req.body.primaryColor ||
         hotel.theme?.primary ||
         selectedTheme.primary,
+
       secondary:
-        req.body.themeSecondary || req.body.secondaryColor ||
+        req.body.themeSecondary ||
+        req.body.secondaryColor ||
         hotel.theme?.secondary ||
         selectedTheme.secondary,
+
       accent:
-        req.body.themeAccent || req.body.accentColor ||
+        req.body.themeAccent ||
+        req.body.accentColor ||
         hotel.theme?.accent ||
         selectedTheme.accent,
+
       text:
-        req.body.themeText || req.body.text ||
+        req.body.themeText ||
+        req.body.text ||
         hotel.theme?.text ||
         selectedTheme.text,
+
       mode:
-        req.body.themeMode || req.body.mode ||
+        req.body.themeMode ||
+        req.body.mode ||
         hotel.theme?.mode ||
         selectedTheme.mode,
     };
 
-    /* =======================================================
-       SETUP COMPLETE
-    ======================================================= */
+    /*
+    =========================================================
+    SETUP COMPLETE
+    =========================================================
+    */
 
     hotel.setupCompleted = true;
 
+    // Make sure hotel is active when created/setup
+    if (hotel.isActive === undefined) {
+      hotel.isActive = true;
+    }
+
+    /*
+    =========================================================
+    SAVE HOTEL
+    =========================================================
+    */
+
     await hotel.save();
 
-    /* =======================================================
-       RESPONSE
-    ======================================================= */
+    /*
+    =========================================================
+    VERY IMPORTANT:
+    LINK HOTEL TO OWNER
+    =========================================================
+    */
+
+    user.hotelId = hotel._id;
+
+    await user.save();
+
+    /*
+    =========================================================
+    RESPONSE
+    =========================================================
+    */
 
     return res.status(200).json({
       success: true,
-      message: "Hotel setup completed successfully",
+
+      message:
+        "Hotel setup completed successfully",
+
       hotel,
+
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        hotelId: user.hotelId,
+        accountStatus: user.accountStatus,
+        subscriptionPlan: user.subscriptionPlan,
+      },
     });
+
   } catch (err) {
-    console.error("HOTEL SETUP ERROR:", err);
+    console.error(
+      "HOTEL SETUP ERROR:",
+      err
+    );
 
     return res.status(500).json({
       success: false,
-      message: err.message || "Hotel setup failed",
+      message:
+        err.message ||
+        "Hotel setup failed",
     });
   }
 };
