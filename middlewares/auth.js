@@ -1,11 +1,8 @@
 import jwt from "jsonwebtoken";
 
 const auth = (req, res, next) => {
-
   try {
-
-    const authHeader =
-      req.headers.authorization;
+    const authHeader = req.headers.authorization;
 
     if (
       !authHeader ||
@@ -17,8 +14,7 @@ const auth = (req, res, next) => {
       });
     }
 
-    const token =
-      authHeader.split(" ")[1];
+    const token = authHeader.split(" ")[1];
 
     if (!token) {
       return res.status(401).json({
@@ -31,8 +27,6 @@ const auth = (req, res, next) => {
       token,
       process.env.JWT_SECRET
     );
-
-    // PRODUCTION SAFETY CHECKS
 
     if (!decoded.id) {
       return res.status(401).json({
@@ -48,23 +42,16 @@ const auth = (req, res, next) => {
       });
     }
 
-    if (!decoded.hotelId) {
-      return res.status(401).json({
-        success: false,
-        message: "Hotel access missing",
-      });
-    }
-
+    // hotelId can be null for self-registered owners
     req.user = {
       id: decoded.id,
       role: decoded.role,
-      hotelId: decoded.hotelId,
+      hotelId: decoded.hotelId || null,
     };
 
     next();
 
   } catch (err) {
-
     console.error(
       "AUTH ERROR:",
       err.message
@@ -74,9 +61,7 @@ const auth = (req, res, next) => {
       success: false,
       message: "Invalid or expired token",
     });
-
   }
-
 };
 
 export default auth;
