@@ -440,15 +440,16 @@ export const forgotPassword = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(
-      "FORGOT PASSWORD ERROR:",
-      error
-    );
+  console.error("================================");
+  console.error("FORGOT PASSWORD ERROR:", error);
+  console.error("MESSAGE:", error.message);
+  console.error("CODE:", error.code);
+  console.error("================================");
 
-    res.status(500).json({
-      message: "Unable to process password reset request",
-    });
-  }
+  return res.status(500).json({
+    message: error.message,
+  });
+}
 };
 export const resetPassword = async (req, res) => {
   try {
