@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
+import User from "../models/User.js";
 
-const auth = (req, res, next) => {
+const auth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -35,27 +36,28 @@ const auth = (req, res, next) => {
       });
     }
 
-    if (!decoded.role) {
+    const user = await User.findById(decoded.id).select(
+      "_id role hotelId accountStatus"
+    );
+
+    if (!user) {
       return res.status(401).json({
         success: false,
-        message: "Role missing in token",
+        message: "User not found",
       });
     }
 
-    // hotelId can be null for self-registered owners
     req.user = {
-      id: decoded.id,
-      role: decoded.role,
-      hotelId: decoded.hotelId || null,
+      id: user._id,
+      role: user.role,
+      hotelId: user.hotelId || null,
+      accountStatus: user.accountStatus,
     };
 
     next();
 
   } catch (err) {
-    console.error(
-      "AUTH ERROR:",
-      err.message
-    );
+    console.error("AUTH ERROR:", err.message);
 
     return res.status(401).json({
       success: false,
