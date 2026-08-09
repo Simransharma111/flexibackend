@@ -7,70 +7,57 @@ import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
 
 // CREATE CATEGORY
 
-export const createCategory = async(req,res)=>{
+export const createCategory = async (req, res) => {
+  try {
+    const { name, hotelId, parentCategory } = req.body;
 
-try{
+    if (!name?.trim()) {
+      return res.status(400).json({
+        message: "Category name required"
+      });
+    }
 
-const {
-name
-}=req.body;
+    const finalHotelId = req.user?.hotelId || hotelId;
 
+    if (!finalHotelId) {
+      return res.status(400).json({
+        message: "Hotel ID is required"
+      });
+    }
 
-if(!name){
+    if (!mongoose.Types.ObjectId.isValid(finalHotelId)) {
+      return res.status(400).json({
+        message: "Invalid Hotel ID"
+      });
+    }
 
-return res.status(400).json({
-message:"Category name required"
-});
+    const exists = await MenuCategory.findOne({
+      hotelId: finalHotelId,
+      name: name.trim()
+    });
 
-}
+    if (exists) {
+      return res.status(400).json({
+        message: "Category already exists"
+      });
+    }
 
+    const category = await MenuCategory.create({
+      hotelId: finalHotelId,
+      name: name.trim(),
+      parentCategory: parentCategory || null
+    });
 
-const exists =
-await MenuCategory.findOne({
+    res.status(201).json(category);
 
-hotelId:req.user.hotelId,
-name:name.trim()
+  } catch (error) {
+    console.error("CREATE CATEGORY ERROR:", error);
 
-});
-
-
-if(exists){
-
-return res.status(400).json({
-message:"Category already exists"
-});
-
-}
-
-
-
-const category =
-await MenuCategory.create({
-
-hotelId:req.user.hotelId,
-
-name:name.trim()
-
-});
-
-
-res.status(201).json(category);
-
-
-}
-catch(error){
-
-res.status(500).json({
-
-message:error.message
-
-});
-
-}
-
+    res.status(500).json({
+      message: error.message
+    });
+  }
 };
-
-
 
 // ================================
 // GET CATEGORIES
