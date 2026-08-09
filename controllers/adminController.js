@@ -310,3 +310,67 @@ export const deleteHotel = async (
     });
   }
 };
+export const resetUserPassword = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        message: "User ID is required",
+      });
+    }
+
+    const user = await User.findById(id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    // Super admin should not reset another super admin
+    if (user.role === "superadmin") {
+      return res.status(403).json({
+        message: "Super admin password cannot be reset from here",
+      });
+    }
+
+    // Generate temporary password
+    const temporaryPassword =
+      "FX-" +
+      crypto.randomBytes(3).toString("hex") +
+      "-" +
+      crypto.randomBytes(2).toString("hex");
+
+    // Hash temporary password
+    user.password = await bcrypt.hash(
+      temporaryPassword,
+      10
+    );
+
+    // Force password change after login
+    user.mustChangePassword = true;
+
+    await user.save();
+
+    return res.json({
+      message: "Password reset successfully",
+      temporaryPassword,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "RESET USER PASSWORD ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      message: "Unable to reset user password",
+    });
+  }
+};

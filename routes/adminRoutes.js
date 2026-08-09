@@ -5,7 +5,7 @@ import {
   getAllHotels,
   activateHotel,
   deactivateHotel,
-  deleteHotel,
+  deleteHotel,resetUserPassword
 } from "../controllers/adminController.js";
 
 import auth from "../middlewares/auth.js";
@@ -66,6 +66,12 @@ router.delete(
   auth,
   authorizeRoles("superadmin"),
   deleteHotel
+);
+router.post(
+  "/users/:id/reset-password",
+  auth,
+  authorizeRoles("superadmin"),
+  resetUserPassword
 );
 
 export default router;
