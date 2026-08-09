@@ -4,7 +4,7 @@ import {
 register,
 login,
 changePassword,
-forgotPassword
+forgotPassword,resetPassword
 }
 from "../controllers/authController.js";
 import auth from "../middlewares/auth.js";
@@ -39,6 +39,9 @@ router.post(
 forgotPassword
 );
 
-
+router.post(
+  "/reset-password/:token",
+  resetPassword
+);
 
 export default router;
