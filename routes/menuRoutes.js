@@ -1,138 +1,101 @@
 import express from "express";
-
-import auth from "../middlewares/auth.js";
-import { authorizeRoles } from "../middlewares/role.js";
-
-import upload from "../middlewares/upload.js";
-
 import {
   createCategory,
   getCategories,
   updateCategory,
   deleteCategory,
-
   addDish,
+  getHotelMenu,
   updateDish,
   deleteDish,
-
-  getHotelMenu,
   getMenuByTable,
-  getFeaturedMenu
-
+  getFeaturedMenu,
 } from "../controllers/menuController.js";
 
+import auth from "../middlewares/auth.js";
+import upload from "../middlewares/upload.js";
+import { authorizeRoles } from "../middlewares/role.js";
 
 const router = express.Router();
 
+/* =========================
+   CATEGORIES
+========================= */
 
-
-// =================================
-// CATEGORY ROUTES
-// =================================
-
-
-// create category
 router.post(
   "/category",
   auth,
-  authorizeRoles("owner"),
+  authorizeRoles("owner", "staff"),
   createCategory
 );
 
-
-// get categories
 router.get(
-  "/category/:hotelId",
-  auth,
+  "/categories/:hotelId",
   getCategories
 );
 
-
-// update category
 router.put(
   "/category/:id",
   auth,
-  authorizeRoles("owner"),
+  authorizeRoles("owner", "staff"),
   updateCategory
 );
 
-
-// disable category
 router.delete(
   "/category/:id",
   auth,
-  authorizeRoles("owner"),
+  authorizeRoles("owner", "staff"),
   deleteCategory
 );
 
+/* =========================
+   DISHES
+========================= */
 
-
-
-// =================================
-// DISH ROUTES
-// =================================
-
-
-// add dish
 router.post(
   "/dish",
   auth,
-  authorizeRoles("owner"),
+  authorizeRoles("owner", "staff"),
   upload.single("image"),
   addDish
 );
 
+router.get(
+  "/hotel/:hotelId",
+  getHotelMenu
+);
 
-
-// update dish
 router.put(
   "/dish/:id",
   auth,
-  authorizeRoles("owner"),
+  authorizeRoles("owner", "staff"),
   upload.single("image"),
   updateDish
 );
 
-
-
-// delete dish
 router.delete(
   "/dish/:id",
   auth,
-  authorizeRoles("owner"),
+  authorizeRoles("owner", "staff"),
   deleteDish
 );
 
+/* =========================
+   QR MENU
+========================= */
 
-
-
-// =================================
-// PUBLIC MENU
-// =================================
-
-
-// QR menu
 router.get(
   "/table/:tableId",
   getMenuByTable
 );
 
+/* =========================
+   FEATURED
+========================= */
 
-
-// owner menu list
-router.get(
-  "/:hotelId",
-  getHotelMenu
-);
-
-
-
-// featured menu
 router.get(
   "/featured/:hotelId",
   getFeaturedMenu
 );
-
-
 
 export default router;

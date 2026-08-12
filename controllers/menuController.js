@@ -4,6 +4,9 @@ import mongoose from "mongoose";
 import Table from "../models/Table.js";
 import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
 
+const isValidObjectId = (value) =>
+  mongoose.Types.ObjectId.isValid(value);
+
 const toBoolean = (value, defaultValue = false) => {
   if (value === undefined || value === null) {
     return defaultValue;
@@ -19,109 +22,105 @@ const toBoolean = (value, defaultValue = false) => {
 const cleanTags = (tags) => {
   if (!tags) return [];
 
-  if (Array.isArray(tags)) {
-    return [
-      ...new Set(
-        tags
-          .map((tag) => String(tag).trim())
-          .filter(Boolean)
-      ),
-    ];
-  }
+  const values = Array.isArray(tags)
+    ? tags
+    : String(tags).split(",");
 
   return [
     ...new Set(
-      String(tags)
-        .split(",")
-        .map((tag) => tag.trim())
+      values
+        .map((tag) => String(tag).trim())
         .filter(Boolean)
     ),
   ];
 };
 
-const validateHotelId = (hotelId) => {
-  return (
-    hotelId &&
-    mongoose.Types.ObjectId.isValid(hotelId)
-  );
+const getHotelId = (req) => {
+  const hotelId = req.user?.hotelId;
+
+  if (!hotelId) {
+    return null;
+  }
+
+  return String(hotelId);
 };
 
-// =====================================================
-// CREATE CATEGORY
-// =====================================================
+const populateCategory = {
+  path: "categoryId",
+  select: "name subCategories displayOrder isActive",
+};
+
+/* =====================================================
+   CREATE CATEGORY
+===================================================== */
 
 export const createCategory = async (req, res) => {
   try {
-    const {
-      name,
-      subCategories = [],
-    } = req.body;
+    const hotelId = getHotelId(req);
 
-    if (!name?.trim()) {
+    if (!hotelId) {
+      return res.status(400).json({
+        message: "Hotel not assigned to this account",
+      });
+    }
+
+    if (!isValidObjectId(hotelId)) {
+      return res.status(400).json({
+        message: "Invalid hotel ID",
+      });
+    }
+
+    const name = String(req.body.name || "").trim();
+
+    if (!name) {
       return res.status(400).json({
         message: "Category name required",
       });
     }
 
-    const hotelId = req.user?.hotelId;
+    const subCategories = Array.isArray(
+      req.body.subCategories
+    )
+      ? [
+          ...new Set(
+            req.body.subCategories
+              .map((item) => String(item).trim())
+              .filter(Boolean)
+          ),
+        ]
+      : [];
 
-    if (!hotelId) {
-      return res.status(400).json({
-        message:
-          "Hotel not assigned to this account",
-      });
-    }
+    const existing = await MenuCategory.findOne({
+      hotelId,
+      name,
+    });
 
-    if (!validateHotelId(hotelId)) {
-      return res.status(400).json({
-        message: "Invalid hotel ID",
-      });
-    }
+    if (existing) {
+      if (!existing.isActive) {
+        existing.isActive = true;
+        existing.subCategories = subCategories;
 
-    const cleanName = name.trim();
+        await existing.save();
 
-    const exists =
-      await MenuCategory.findOne({
-        hotelId,
-        name: cleanName,
-        isActive: true,
-      });
+        return res.status(200).json(existing);
+      }
 
-    if (exists) {
       return res.status(400).json({
         message: "Category already exists",
       });
     }
 
-    const cleanSubCategories =
-      Array.isArray(subCategories)
-        ? [
-            ...new Set(
-              subCategories
-                .map((item) =>
-                  String(item).trim()
-                )
-                .filter(Boolean)
-            ),
-          ]
-        : [];
+    const category = await MenuCategory.create({
+      hotelId,
+      name,
+      subCategories,
+      description: req.body.description || "",
+      displayOrder: Number(req.body.displayOrder || 0),
+    });
 
-    const category =
-      await MenuCategory.create({
-        hotelId,
-        name: cleanName,
-        subCategories:
-          cleanSubCategories,
-      });
-
-    return res.status(201).json(
-      category
-    );
+    return res.status(201).json(category);
   } catch (error) {
-    console.error(
-      "CREATE CATEGORY ERROR:",
-      error
-    );
+    console.error("CREATE CATEGORY ERROR:", error);
 
     return res.status(500).json({
       message: error.message,
@@ -129,41 +128,31 @@ export const createCategory = async (req, res) => {
   }
 };
 
-// =====================================================
-// GET CATEGORIES
-// =====================================================
+/* =====================================================
+   GET CATEGORIES
+===================================================== */
 
-export const getCategories = async (
-  req,
-  res
-) => {
+export const getCategories = async (req, res) => {
   try {
-    const { hotelId } =
-      req.params;
+    const { hotelId } = req.params;
 
-    if (!validateHotelId(hotelId)) {
+    if (!isValidObjectId(hotelId)) {
       return res.status(400).json({
         message: "Invalid hotel ID",
       });
     }
 
-    const categories =
-      await MenuCategory.find({
-        hotelId,
-        isActive: true,
-      }).sort({
-        displayOrder: 1,
-        createdAt: 1,
-      });
+    const categories = await MenuCategory.find({
+      hotelId,
+      isActive: true,
+    }).sort({
+      displayOrder: 1,
+      createdAt: 1,
+    });
 
-    return res.json(
-      categories
-    );
+    return res.json(categories);
   } catch (error) {
-    console.error(
-      "GET CATEGORIES ERROR:",
-      error
-    );
+    console.error("GET CATEGORIES ERROR:", error);
 
     return res.status(500).json({
       message: error.message,
@@ -171,113 +160,84 @@ export const getCategories = async (
   }
 };
 
-// =====================================================
-// UPDATE CATEGORY
-// =====================================================
+/* =====================================================
+   UPDATE CATEGORY
+===================================================== */
 
-export const updateCategory = async (
-  req,
-  res
-) => {
+export const updateCategory = async (req, res) => {
   try {
-    const {
-      name,
-      subCategories = [],
-    } = req.body;
-
-    if (!name?.trim()) {
-      return res.status(400).json({
-        message:
-          "Category name required",
-      });
-    }
-
-    const hotelId =
-      req.user?.hotelId;
+    const hotelId = getHotelId(req);
 
     if (!hotelId) {
       return res.status(400).json({
-        message:
-          "Hotel not assigned to this account",
+        message: "Hotel not assigned to this account",
       });
     }
 
-    if (
-      !mongoose.Types.ObjectId.isValid(
-        req.params.id
-      )
-    ) {
+    const categoryId = req.params.id;
+
+    if (!isValidObjectId(categoryId)) {
       return res.status(400).json({
-        message:
-          "Invalid category ID",
+        message: "Invalid category ID",
       });
     }
 
-    const category =
-      await MenuCategory.findOne({
-        _id: req.params.id,
-        hotelId,
-        isActive: true,
+    const name = String(req.body.name || "").trim();
+
+    if (!name) {
+      return res.status(400).json({
+        message: "Category name required",
       });
+    }
+
+    const category = await MenuCategory.findOne({
+      _id: categoryId,
+      hotelId,
+      isActive: true,
+    });
 
     if (!category) {
       return res.status(404).json({
-        message:
-          "Category not found",
+        message: "Category not found",
       });
     }
 
-    const cleanName =
-      name.trim();
-
-    const duplicate =
-      await MenuCategory.findOne({
-        _id: {
-          $ne: category._id,
-        },
-        hotelId,
-        name: cleanName,
-        isActive: true,
-      });
+    const duplicate = await MenuCategory.findOne({
+      _id: { $ne: categoryId },
+      hotelId,
+      name,
+    });
 
     if (duplicate) {
       return res.status(400).json({
-        message:
-          "Category already exists",
+        message: "Category already exists",
       });
     }
 
-    const cleanSubCategories =
-      Array.isArray(
-        subCategories
-      )
-        ? [
-            ...new Set(
-              subCategories
-                .map((item) =>
-                  String(item).trim()
-                )
-                .filter(Boolean)
-            ),
-          ]
-        : [];
+    const subCategories = Array.isArray(
+      req.body.subCategories
+    )
+      ? [
+          ...new Set(
+            req.body.subCategories
+              .map((item) => String(item).trim())
+              .filter(Boolean)
+          ),
+        ]
+      : [];
 
-    category.name =
-      cleanName;
-
-    category.subCategories =
-      cleanSubCategories;
+    category.name = name;
+    category.description = req.body.description || "";
+    category.subCategories = subCategories;
+    category.displayOrder = Number(
+      req.body.displayOrder || 0
+    );
 
     await category.save();
 
-    return res.json(
-      category
-    );
+    return res.json(category);
   } catch (error) {
-    console.error(
-      "UPDATE CATEGORY ERROR:",
-      error
-    );
+    console.error("UPDATE CATEGORY ERROR:", error);
 
     return res.status(500).json({
       message: error.message,
@@ -285,49 +245,34 @@ export const updateCategory = async (
   }
 };
 
-// =====================================================
-// DELETE CATEGORY
-// =====================================================
+/* =====================================================
+   DELETE CATEGORY
+===================================================== */
 
-export const deleteCategory = async (
-  req,
-  res
-) => {
+export const deleteCategory = async (req, res) => {
   try {
-    const hotelId =
-      req.user?.hotelId;
+    const hotelId = getHotelId(req);
+    const categoryId = req.params.id;
 
     if (!hotelId) {
       return res.status(400).json({
-        message:
-          "Hotel not assigned to this account",
+        message: "Hotel not assigned to this account",
       });
     }
 
-    if (
-      !mongoose.Types.ObjectId.isValid(
-        req.params.id
-      )
-    ) {
+    if (!isValidObjectId(categoryId)) {
       return res.status(400).json({
-        message:
-          "Invalid category ID",
+        message: "Invalid category ID",
       });
     }
 
-    /*
-     * Don't allow deletion of a category
-     * that still has dishes.
-     */
-    const dishes =
-      await Menu.countDocuments({
-        categoryId:
-          req.params.id,
-        hotelId,
-        isDeleted: false,
-      });
+    const dishCount = await Menu.countDocuments({
+      hotelId,
+      categoryId,
+      isDeleted: false,
+    });
 
-    if (dishes > 0) {
+    if (dishCount > 0) {
       return res.status(400).json({
         message:
           "This category contains dishes. Move or delete the dishes first.",
@@ -337,7 +282,7 @@ export const deleteCategory = async (
     const category =
       await MenuCategory.findOneAndUpdate(
         {
-          _id: req.params.id,
+          _id: categoryId,
           hotelId,
         },
         {
@@ -350,21 +295,16 @@ export const deleteCategory = async (
 
     if (!category) {
       return res.status(404).json({
-        message:
-          "Category not found",
+        message: "Category not found",
       });
     }
 
     return res.json({
-      message:
-        "Category disabled",
+      message: "Category disabled",
       category,
     });
   } catch (error) {
-    console.error(
-      "DELETE CATEGORY ERROR:",
-      error
-    );
+    console.error("DELETE CATEGORY ERROR:", error);
 
     return res.status(500).json({
       message: error.message,
@@ -372,261 +312,193 @@ export const deleteCategory = async (
   }
 };
 
-// =====================================================
-// ADD DISH
-// =====================================================
+/* =====================================================
+   ADD DISH
+===================================================== */
 
-export const addDish = async (
-  req,
-  res
-) => {
+export const addDish = async (req, res) => {
   try {
-    const {
-      categoryId,
-      subCategory,
-      name,
-      description,
-      price,
-      prepTime,
-      foodType,
-      featured,
-      todaySpecial,
-      isRecommended,
-      isBestseller,
-      isPopular,
-      isNewArrival,
-      chefChoice,
-      spiceLevel,
-      tags,
-      scheduledFor,
-      displayOrder,
-      gst,
-    } = req.body;
-
-    const hotelId =
-      req.user?.hotelId;
+    const hotelId = getHotelId(req);
 
     if (!hotelId) {
       return res.status(400).json({
-        message:
-          "Hotel not assigned to this account",
+        message: "Hotel not assigned to this account",
       });
     }
 
-    if (!validateHotelId(hotelId)) {
+    if (!isValidObjectId(hotelId)) {
       return res.status(400).json({
-        message:
-          "Invalid hotel ID",
+        message: "Invalid hotel ID",
       });
     }
 
-    /*
-     * IMPORTANT:
-     * categoryId is mandatory.
-     */
+    const categoryId = String(
+      req.body.categoryId || ""
+    ).trim();
+
+    console.log("ADD DISH:", {
+      hotelId,
+      categoryId,
+      name: req.body.name,
+    });
+
     if (!categoryId) {
       return res.status(400).json({
-        message:
-          "Category is required",
+        message: "Category is required",
       });
     }
 
-    if (
-      !mongoose.Types.ObjectId.isValid(
-        categoryId
-      )
-    ) {
+    if (!isValidObjectId(categoryId)) {
       return res.status(400).json({
-        message:
-          "Invalid category ID",
+        message: "Invalid category ID",
       });
     }
 
-    if (!name?.trim()) {
-      return res.status(400).json({
-        message:
-          "Dish name is required",
-      });
-    }
-
-    const numericPrice =
-      Number(price);
-
-    if (
-      !Number.isFinite(
-        numericPrice
-      ) ||
-      numericPrice < 0
-    ) {
-      return res.status(400).json({
-        message:
-          "Invalid dish price",
-      });
-    }
-
-    const category =
-      await MenuCategory.findOne({
-        _id: categoryId,
-        hotelId,
-        isActive: true,
-      });
+    const category = await MenuCategory.findOne({
+      _id: categoryId,
+      hotelId,
+      isActive: true,
+    });
 
     if (!category) {
       return res.status(400).json({
         message:
-          "Invalid category",
+          "Invalid category. Please select an active category belonging to this hotel.",
       });
     }
 
-    const cleanSubCategory =
-      typeof subCategory ===
-      "string"
-        ? subCategory.trim()
-        : "";
+    const name = String(req.body.name || "").trim();
+
+    if (!name) {
+      return res.status(400).json({
+        message: "Dish name is required",
+      });
+    }
+
+    const price = Number(req.body.price);
+
+    if (!Number.isFinite(price) || price < 0) {
+      return res.status(400).json({
+        message: "Invalid dish price",
+      });
+    }
+
+    const subCategory = String(
+      req.body.subCategory || ""
+    ).trim();
 
     if (
-      cleanSubCategory &&
-      category.subCategories
-        .length > 0 &&
-      !category.subCategories.includes(
-        cleanSubCategory
-      )
+      subCategory &&
+      category.subCategories.length > 0 &&
+      !category.subCategories.includes(subCategory)
     ) {
       return res.status(400).json({
-        message:
-          "Invalid subcategory",
+        message: "Invalid subcategory",
       });
     }
 
     let image = "";
 
     if (req.file) {
-      const result =
-        await uploadToCloudinary(
-          req.file.buffer,
-          "menu"
-        );
+      const result = await uploadToCloudinary(
+        req.file.buffer,
+        "menu"
+      );
 
-      image =
-        result.secure_url;
+      image = result.secure_url;
     }
 
-    const dish =
-      await Menu.create({
-        hotelId,
+    const dish = await Menu.create({
+      hotelId,
 
-        categoryId,
+      categoryId,
 
-        subCategory:
-          cleanSubCategory,
+      subCategory,
 
-        name:
-          name.trim(),
+      name,
 
-        description:
-          description || "",
+      description: String(
+        req.body.description || ""
+      ),
 
-        price:
-          numericPrice,
+      price,
 
-        prepTime:
-          Number(prepTime) || 15,
+      prepTime:
+        Number(req.body.prepTime) || 15,
 
-        foodType:
-          foodType || "veg",
+      foodType:
+        req.body.foodType === "nonveg"
+          ? "nonveg"
+          : "veg",
 
-        image,
+      image,
 
-        isAvailable:
-          req.body.isAvailable ===
-            undefined
-            ? true
-            : toBoolean(
-                req.body.isAvailable,
-                true
-              ),
+      isAvailable: toBoolean(
+        req.body.isAvailable,
+        true
+      ),
 
-        featured:
-          toBoolean(
-            featured
-          ),
+      isRecommended: toBoolean(
+        req.body.isRecommended
+      ),
 
-        todaySpecial:
-          toBoolean(
-            todaySpecial
-          ),
+      isBestseller: toBoolean(
+        req.body.isBestseller
+      ),
 
-        isRecommended:
-          toBoolean(
-            isRecommended
-          ),
+      featured: toBoolean(
+        req.body.featured
+      ),
 
-        isBestseller:
-          toBoolean(
-            isBestseller
-          ),
+      todaySpecial: toBoolean(
+        req.body.todaySpecial
+      ),
 
-        isPopular:
-          toBoolean(
-            isPopular
-          ),
+      isPopular: toBoolean(
+        req.body.isPopular
+      ),
 
-        isNewArrival:
-          toBoolean(
-            isNewArrival
-          ),
+      isNewArrival: toBoolean(
+        req.body.isNewArrival
+      ),
 
-        chefChoice:
-          toBoolean(
-            chefChoice
-          ),
+      chefChoice: toBoolean(
+        req.body.chefChoice
+      ),
 
-        spiceLevel:
-          spiceLevel || "",
+      spiceLevel:
+        req.body.spiceLevel || "",
 
-        tags:
-          cleanTags(tags),
+      tags: cleanTags(req.body.tags),
 
-        gst:
-          gst !== undefined &&
-          gst !== ""
-            ? Number(gst)
-            : null,
+      gst:
+        req.body.gst !== undefined &&
+        req.body.gst !== ""
+          ? Number(req.body.gst)
+          : null,
 
-        displayOrder:
-          Number(
-            displayOrder || 0
-          ),
+      displayOrder:
+        Number(req.body.displayOrder) || 0,
 
-        isScheduled:
-          Boolean(
-            scheduledFor
-          ),
+      isScheduled: Boolean(
+        req.body.scheduledFor
+      ),
 
-        scheduledFor:
-          scheduledFor ||
-          null,
-      });
+      scheduledFor:
+        req.body.scheduledFor || null,
+    });
 
     const populatedDish =
-      await Menu.findById(
-        dish._id
-      ).populate({
-        path: "categoryId",
-        select:
-          "name subCategories displayOrder isActive",
-      });
-
-    return res
-      .status(201)
-      .json(
-        populatedDish
+      await Menu.findById(dish._id).populate(
+        populateCategory
       );
+
+    return res.status(201).json({
+      success: true,
+      dish: populatedDish,
+    });
   } catch (error) {
-    console.error(
-      "ADD DISH ERROR:",
-      error
-    );
+    console.error("ADD DISH ERROR:", error);
 
     return res.status(500).json({
       message: error.message,
@@ -634,52 +506,33 @@ export const addDish = async (
   }
 };
 
-// =====================================================
-// GET HOTEL MENU
-// =====================================================
+/* =====================================================
+   GET HOTEL MENU
+===================================================== */
 
-export const getHotelMenu = async (
-  req,
-  res
-) => {
+export const getHotelMenu = async (req, res) => {
   try {
-    const { hotelId } =
-      req.params;
+    const { hotelId } = req.params;
 
-    if (
-      !validateHotelId(
-        hotelId
-      )
-    ) {
+    if (!isValidObjectId(hotelId)) {
       return res.status(400).json({
-        message:
-          "Invalid Hotel ID",
+        message: "Invalid hotel ID",
       });
     }
 
-    const dishes =
-      await Menu.find({
-        hotelId,
-        isDeleted: false,
-      })
-        .populate({
-          path: "categoryId",
-          select:
-            "name subCategories displayOrder isActive",
-        })
-        .sort({
-          displayOrder: 1,
-          createdAt: -1,
-        });
+    const dishes = await Menu.find({
+      hotelId,
+      isDeleted: false,
+    })
+      .populate(populateCategory)
+      .sort({
+        displayOrder: 1,
+        createdAt: -1,
+      });
 
-    return res
-      .status(200)
-      .json(dishes);
+    return res.json(dishes);
   } catch (error) {
-    console.error(
-      "GET MENU ERROR:",
-      error
-    );
+    console.error("GET MENU ERROR:", error);
 
     return res.status(500).json({
       message: error.message,
@@ -687,228 +540,172 @@ export const getHotelMenu = async (
   }
 };
 
-// =====================================================
-// UPDATE DISH
-// =====================================================
+/* =====================================================
+   UPDATE DISH
+===================================================== */
 
-export const updateDish = async (
-  req,
-  res
-) => {
+export const updateDish = async (req, res) => {
   try {
-    const hotelId =
-      req.user?.hotelId;
+    const hotelId = getHotelId(req);
+    const dishId = req.params.id;
 
     if (!hotelId) {
       return res.status(400).json({
-        message:
-          "Hotel not assigned to this account",
+        message: "Hotel not assigned to this account",
       });
     }
 
-    if (
-      !mongoose.Types.ObjectId.isValid(
-        req.params.id
-      )
-    ) {
+    if (!isValidObjectId(dishId)) {
       return res.status(400).json({
-        message:
-          "Invalid dish ID",
+        message: "Invalid dish ID",
       });
     }
 
-    const dish =
-      await Menu.findById(
-        req.params.id
-      );
+    const dish = await Menu.findOne({
+      _id: dishId,
+      hotelId,
+      isDeleted: false,
+    });
 
     if (!dish) {
       return res.status(404).json({
-        message:
-          "Dish not found",
+        message: "Dish not found",
       });
     }
 
-    if (
-      dish.hotelId.toString() !==
-      hotelId.toString()
-    ) {
-      return res.status(403).json({
-        message:
-          "You cannot update this dish",
-      });
-    }
-
-    let categoryId =
+    const categoryId = String(
       req.body.categoryId ||
-      dish.categoryId;
+        dish.categoryId ||
+        ""
+    ).trim();
 
-    if (
-      !mongoose.Types.ObjectId.isValid(
-        categoryId
-      )
-    ) {
+    if (!isValidObjectId(categoryId)) {
       return res.status(400).json({
-        message:
-          "Invalid category ID",
+        message: "Invalid category ID",
       });
     }
 
-    const category =
-      await MenuCategory.findOne({
-        _id: categoryId,
-        hotelId,
-        isActive: true,
-      });
+    const category = await MenuCategory.findOne({
+      _id: categoryId,
+      hotelId,
+      isActive: true,
+    });
 
     if (!category) {
       return res.status(400).json({
-        message:
-          "Invalid category",
+        message: "Invalid category",
       });
     }
 
-    const cleanSubCategory =
-      typeof req.body.subCategory ===
-      "string"
-        ? req.body.subCategory.trim()
-        : dish.subCategory ||
-          "";
+    const updateData = {
+      categoryId,
+      subCategory:
+        req.body.subCategory !== undefined
+          ? String(req.body.subCategory).trim()
+          : dish.subCategory,
+    };
 
     if (
-      cleanSubCategory &&
-      category.subCategories
-        .length > 0 &&
+      updateData.subCategory &&
+      category.subCategories.length > 0 &&
       !category.subCategories.includes(
-        cleanSubCategory
+        updateData.subCategory
       )
     ) {
       return res.status(400).json({
-        message:
-          "Invalid subcategory",
+        message: "Invalid subcategory",
       });
     }
 
-    const updateData = {};
+    if (req.body.name !== undefined) {
+      const name = String(req.body.name).trim();
 
-    if (
-      req.body.name !==
-      undefined
-    ) {
-      updateData.name =
-        req.body.name.trim();
+      if (!name) {
+        return res.status(400).json({
+          message: "Dish name is required",
+        });
+      }
+
+      updateData.name = name;
     }
 
-    if (
-      req.body.description !==
-      undefined
-    ) {
+    if (req.body.description !== undefined) {
       updateData.description =
         req.body.description;
     }
 
-    updateData.categoryId =
-      categoryId;
+    if (req.body.price !== undefined) {
+      const price = Number(req.body.price);
 
-    updateData.subCategory =
-      cleanSubCategory;
+      if (!Number.isFinite(price) || price < 0) {
+        return res.status(400).json({
+          message: "Invalid dish price",
+        });
+      }
 
-    if (
-      req.body.price !==
-      undefined
-    ) {
-      updateData.price =
-        Number(
-          req.body.price
-        );
+      updateData.price = price;
     }
 
-    if (
-      req.body.prepTime !==
-      undefined
-    ) {
+    if (req.body.prepTime !== undefined) {
       updateData.prepTime =
-        Number(
-          req.body.prepTime
-        ) || 15;
+        Number(req.body.prepTime) || 15;
     }
 
-    if (
-      req.body.foodType !==
-      undefined
-    ) {
+    if (req.body.foodType !== undefined) {
       updateData.foodType =
-        req.body.foodType ||
-        "veg";
+        req.body.foodType === "nonveg"
+          ? "nonveg"
+          : "veg";
     }
 
     const booleanFields = [
       "isAvailable",
-      "featured",
-      "todaySpecial",
       "isRecommended",
       "isBestseller",
+      "featured",
+      "todaySpecial",
       "isPopular",
       "isNewArrival",
       "chefChoice",
     ];
 
-    booleanFields.forEach(
-      (field) => {
-        if (
-          req.body[field] !==
-          undefined
-        ) {
-          updateData[field] =
-            toBoolean(
-              req.body[field]
-            );
-        }
+    booleanFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        updateData[field] = toBoolean(
+          req.body[field]
+        );
       }
-    );
+    });
 
-    if (
-      req.body.spiceLevel !==
-      undefined
-    ) {
+    if (req.body.spiceLevel !== undefined) {
       updateData.spiceLevel =
-        req.body.spiceLevel ||
-        "";
+        req.body.spiceLevel || "";
     }
 
-    if (
-      req.body.tags !==
-      undefined
-    ) {
-      updateData.tags =
-        cleanTags(
-          req.body.tags
-        );
+    if (req.body.tags !== undefined) {
+      updateData.tags = cleanTags(
+        req.body.tags
+      );
     }
 
-    if (
-      req.body.displayOrder !==
-      undefined
-    ) {
+    if (req.body.gst !== undefined) {
+      updateData.gst =
+        req.body.gst === ""
+          ? null
+          : Number(req.body.gst);
+    }
+
+    if (req.body.displayOrder !== undefined) {
       updateData.displayOrder =
-        Number(
-          req.body.displayOrder ||
-            0
-        );
+        Number(req.body.displayOrder) || 0;
     }
 
-    if (
-      req.body.scheduledFor !==
-      undefined
-    ) {
+    if (req.body.scheduledFor !== undefined) {
       updateData.isScheduled =
-        Boolean(
-          req.body.scheduledFor
-        );
+        Boolean(req.body.scheduledFor);
 
       updateData.scheduledFor =
-        req.body.scheduledFor ||
-        null;
+        req.body.scheduledFor || null;
     }
 
     if (req.file) {
@@ -925,7 +722,7 @@ export const updateDish = async (
     const updatedDish =
       await Menu.findOneAndUpdate(
         {
-          _id: req.params.id,
+          _id: dishId,
           hotelId,
         },
         updateData,
@@ -933,20 +730,14 @@ export const updateDish = async (
           new: true,
           runValidators: true,
         }
-      ).populate({
-        path: "categoryId",
-        select:
-          "name subCategories displayOrder isActive",
-      });
+      ).populate(populateCategory);
 
-    return res.json(
-      updatedDish
-    );
+    return res.json({
+      success: true,
+      dish: updatedDish,
+    });
   } catch (error) {
-    console.error(
-      "UPDATE DISH ERROR:",
-      error
-    );
+    console.error("UPDATE DISH ERROR:", error);
 
     return res.status(500).json({
       message: error.message,
@@ -954,30 +745,33 @@ export const updateDish = async (
   }
 };
 
-// =====================================================
-// DELETE DISH
-// =====================================================
+/* =====================================================
+   DELETE DISH
+===================================================== */
 
-export const deleteDish = async (
-  req,
-  res
-) => {
+export const deleteDish = async (req, res) => {
   try {
-    const hotelId =
-      req.user?.hotelId;
+    const hotelId = getHotelId(req);
+    const dishId = req.params.id;
 
     if (!hotelId) {
       return res.status(400).json({
-        message:
-          "Hotel not assigned to this account",
+        message: "Hotel not assigned to this account",
+      });
+    }
+
+    if (!isValidObjectId(dishId)) {
+      return res.status(400).json({
+        message: "Invalid dish ID",
       });
     }
 
     const dish =
       await Menu.findOneAndUpdate(
         {
-          _id: req.params.id,
+          _id: dishId,
           hotelId,
+          isDeleted: false,
         },
         {
           isDeleted: true,
@@ -990,21 +784,17 @@ export const deleteDish = async (
 
     if (!dish) {
       return res.status(404).json({
-        message:
-          "Dish not found",
+        message: "Dish not found",
       });
     }
 
     return res.json({
-      message:
-        "Dish moved to deleted",
+      success: true,
+      message: "Dish moved to deleted",
       dish,
     });
   } catch (error) {
-    console.error(
-      "DELETE DISH ERROR:",
-      error
-    );
+    console.error("DELETE DISH ERROR:", error);
 
     return res.status(500).json({
       message: error.message,
@@ -1012,61 +802,42 @@ export const deleteDish = async (
   }
 };
 
-// =====================================================
-// GET MENU BY TABLE / QR
-// =====================================================
+/* =====================================================
+   GET MENU BY TABLE / QR
+===================================================== */
 
-export const getMenuByTable = async (
-  req,
-  res
-) => {
+export const getMenuByTable = async (req, res) => {
   try {
-    const { tableId } =
-      req.params;
+    const { tableId } = req.params;
 
     let table = null;
 
-    if (
-      mongoose.Types.ObjectId.isValid(
-        tableId
-      )
-    ) {
-      table =
-        await Table.findById(
-          tableId
-        );
+    if (isValidObjectId(tableId)) {
+      table = await Table.findById(tableId);
     }
 
     if (!table) {
-      table =
-        await Table.findOne({
-          qrId: tableId,
-        });
+      table = await Table.findOne({
+        qrId: tableId,
+      });
     }
 
     if (!table) {
       return res.status(404).json({
-        message:
-          "Table not found",
+        message: "Table not found",
       });
     }
 
-    const dishes =
-      await Menu.find({
-        hotelId:
-          table.hotelId,
-        isAvailable: true,
-        isDeleted: false,
-      })
-        .populate({
-          path: "categoryId",
-          select:
-            "name subCategories displayOrder isActive",
-        })
-        .sort({
-          displayOrder: 1,
-          createdAt: -1,
-        });
+    const dishes = await Menu.find({
+      hotelId: table.hotelId,
+      isAvailable: true,
+      isDeleted: false,
+    })
+      .populate(populateCategory)
+      .sort({
+        displayOrder: 1,
+        createdAt: -1,
+      });
 
     return res.json({
       success: true,
@@ -1085,82 +856,55 @@ export const getMenuByTable = async (
   }
 };
 
-// =====================================================
-// GET FEATURED MENU
-// =====================================================
+/* =====================================================
+   GET FEATURED MENU
+===================================================== */
 
-export const getFeaturedMenu = async (
-  req,
-  res
-) => {
+export const getFeaturedMenu = async (req, res) => {
   try {
-    const {
-      hotelId,
-    } = req.params;
+    const { hotelId } = req.params;
 
-    if (
-      !validateHotelId(
-        hotelId
-      )
-    ) {
+    if (!isValidObjectId(hotelId)) {
       return res.status(400).json({
-        message:
-          "Invalid hotel ID",
+        message: "Invalid hotel ID",
       });
     }
 
-    const dishes =
-      await Menu.find({
-        hotelId,
-        isAvailable: true,
-        isDeleted: false,
-      })
-        .populate({
-          path: "categoryId",
-          select:
-            "name subCategories displayOrder isActive",
-        })
-        .sort({
-          displayOrder: 1,
-          createdAt: -1,
-        });
+    const dishes = await Menu.find({
+      hotelId,
+      isAvailable: true,
+      isDeleted: false,
+    })
+      .populate(populateCategory)
+      .sort({
+        displayOrder: 1,
+        createdAt: -1,
+      });
 
     return res.json({
-      todaySpecial:
-        dishes.filter(
-          (d) =>
-            d.todaySpecial
-        ),
+      todaySpecial: dishes.filter(
+        (dish) => dish.todaySpecial
+      ),
 
-      recommended:
-        dishes.filter(
-          (d) =>
-            d.isRecommended
-        ),
+      recommended: dishes.filter(
+        (dish) => dish.isRecommended
+      ),
 
-      popular:
-        dishes.filter(
-          (d) =>
-            d.isPopular
-        ),
+      popular: dishes.filter(
+        (dish) => dish.isPopular
+      ),
 
-      bestSeller:
-        dishes.filter(
-          (d) =>
-            d.isBestseller
-        ),
+      bestSeller: dishes.filter(
+        (dish) => dish.isBestseller
+      ),
 
-      newArrival:
-        dishes.filter(
-          (d) =>
-            d.isNewArrival
-        ),
+      newArrival: dishes.filter(
+        (dish) => dish.isNewArrival
+      ),
 
-      featured:
-        dishes.filter(
-          (d) =>
-            d.featured
-        ),
+      featured: dishes.filter(
+        (dish) => dish.featured
+      ),
 
       all: dishes,
     });
