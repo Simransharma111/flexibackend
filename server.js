@@ -10,18 +10,19 @@ import connectDB from "./config/db.js";
 
 import adminRoutes from "./routes/adminRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
-import menuRoutes from "./routes/menuRoutes.js";
+// import menuRoutes from "./routes/menuRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import staffRoutes from "./routes/staffRoutes.js";
 import kitchenRoutes from "./routes/kitchenRoutes.js";
 import qrRoutes from "./routes/qrRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
-import paymentRoutes from "./routes/paymentRoutes.js";
+// import paymentRoutes from "./routes/paymentRoutes.js";
 import tableRoutes from "./routes/tableRoutes.js";
 import publicRoutes from "./routes/publicRoutes.js";
 import hotelRoutes from "./routes/hotelRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
-import categoryRoutes from "./routes/categoryRoutes.js";
+// import categoryRoutes from "./routes/categoryRoutes.js";
+import menuCategoryRoutes from "./routes/menuCategoryRoutes.js";
 
 dotenv.config();
 
@@ -185,18 +186,22 @@ app.use(
  authRoutes
 );
 
-
 app.use(
- "/api/menu",
- menuRoutes
+  "/api/menu-categories",
+  menuCategoryRoutes
 );
 
+// app.use(
+//  "/api/menu",
+//  menuRoutes
+// );
 
 
-app.use(
-"/api/categories",
-categoryRoutes
-);
+
+// app.use(
+// "/api/categories",
+// categoryRoutes
+// );
 
 app.use(
  "/api/public",
@@ -228,10 +233,10 @@ app.use(
 );
 
 
-app.use(
- "/api/payment",
- paymentRoutes
-);
+// app.use(
+//  "/api/payment",
+//  paymentRoutes
+// );
 
 
 app.use(
