@@ -6,12 +6,14 @@ const menuCategorySchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Hotel",
       required: true,
+      index: true,
     },
 
     name: {
       type: String,
       required: true,
       trim: true,
+      maxlength: 100,
     },
 
     description: {
@@ -20,9 +22,14 @@ const menuCategorySchema = new mongoose.Schema(
       trim: true,
     },
 
-    image: {
-      type: String,
-      default: "",
+    subCategories: {
+      type: [String],
+      default: [],
+    },
+
+    displayOrder: {
+      type: Number,
+      default: 0,
     },
 
     isActive: {
@@ -30,9 +37,9 @@ const menuCategorySchema = new mongoose.Schema(
       default: true,
     },
 
-    sortOrder: {
-      type: Number,
-      default: 0,
+    image: {
+      type: String,
+      default: "",
     },
   },
   {
@@ -40,73 +47,12 @@ const menuCategorySchema = new mongoose.Schema(
   }
 );
 
-menuCategorySchema.index({
-  hotelId: 1,
-  name: 1,
-});
+menuCategorySchema.index(
+  { hotelId: 1, name: 1 },
+  { unique: true }
+);
 
 export default mongoose.model(
   "MenuCategory",
   menuCategorySchema
 );
-// import mongoose from "mongoose";
-
-// const menuCategorySchema = new mongoose.Schema(
-//   {
-//     // Restaurant
-//     hotelId: {
-//       type: mongoose.Schema.Types.ObjectId,
-//       ref: "Hotel",
-//       required: true,
-//       index: true,
-//     },
-
-//     // Category Name
-//     name: {
-//       type: String,
-//       required: true,
-//       trim: true,
-//       maxlength: 50,
-//     },
-
-//     // Optional Subcategory Names
-//     // Example:
-//     // ["Veg Starter", "Non Veg Starter"]
-//     subCategories: {
-//       type: [String],
-//       default: [],
-//     },
-
-//     // Display Order
-//     displayOrder: {
-//       type: Number,
-//       default: 0,
-//     },
-
-//     // Show / Hide Category
-//     isActive: {
-//       type: Boolean,
-//       default: true,
-//     },
-
-//     // Optional Category Image/Icon
-//     image: {
-//       type: String,
-//       default: "",
-//     },
-//   },
-//   {
-//     timestamps: true,
-//   }
-// );
-
-// // Prevent duplicate category names within the same hotel
-// menuCategorySchema.index(
-//   { hotelId: 1, name: 1 },
-//   { unique: true }
-// );
-
-// export default mongoose.model(
-//   "MenuCategory",
-//   menuCategorySchema
-// );
