@@ -1,4 +1,5 @@
 import express from "express";
+
 import {
   createCategory,
   getCategories,
@@ -31,8 +32,6 @@ router.post(
 
 router.get(
   "/categories/:hotelId",
-  auth,
-  authorizeRoles("owner", "staff"),
   getCategories
 );
 
@@ -62,14 +61,8 @@ router.post(
   addDish
 );
 
-/*
-  OWNER MENU
-  GET /api/menu/:hotelId
-*/
 router.get(
   "/:hotelId",
-  auth,
-  authorizeRoles("owner", "staff"),
   getHotelMenu
 );
 
