@@ -31,6 +31,8 @@ router.post(
 
 router.get(
   "/categories/:hotelId",
+  auth,
+  authorizeRoles("owner", "staff"),
   getCategories
 );
 
@@ -60,8 +62,14 @@ router.post(
   addDish
 );
 
+/*
+  OWNER MENU
+  GET /api/menu/:hotelId
+*/
 router.get(
-  "/hotel/:hotelId",
+  "/:hotelId",
+  auth,
+  authorizeRoles("owner", "staff"),
   getHotelMenu
 );
 
