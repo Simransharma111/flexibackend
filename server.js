@@ -10,7 +10,7 @@ import connectDB from "./config/db.js";
 
 import adminRoutes from "./routes/adminRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
-// import menuRoutes from "./routes/menuRoutes.js";
+import menuRoutes from "./routes/menuRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import staffRoutes from "./routes/staffRoutes.js";
 import kitchenRoutes from "./routes/kitchenRoutes.js";
@@ -191,10 +191,10 @@ app.use(
   menuCategoryRoutes
 );
 
-// app.use(
-//  "/api/menu",
-//  menuRoutes
-// );
+app.use(
+ "/api/menu",
+ menuRoutes
+);
 
 
 
