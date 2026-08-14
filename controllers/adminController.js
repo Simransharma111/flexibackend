@@ -1,6 +1,7 @@
 import Hotel from "../models/Hotel.js";
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 // =====================================================
 // CREATE HOTEL + OWNER
@@ -17,85 +18,153 @@ export const createHotelWithOwner = async (req, res) => {
       ownerPassword,
     } = req.body;
 
+    // -------------------------------------------------
+    // VALIDATION
+    // -------------------------------------------------
+
     if (
-      !hotelName ||
-      !ownerName ||
-      !ownerEmail ||
+      !hotelName?.trim() ||
+      !ownerName?.trim() ||
+      !ownerEmail?.trim() ||
       !ownerPassword
     ) {
       return res.status(400).json({
-        message: "All fields required",
+        success: false,
+        message: "All fields are required",
       });
     }
 
+    const cleanEmail = ownerEmail
+      .trim()
+      .toLowerCase();
+
+    // -------------------------------------------------
+    // CHECK EXISTING OWNER
+    // -------------------------------------------------
+
     const existingUser = await User.findOne({
-      email: ownerEmail,
+      email: cleanEmail,
     });
 
     if (existingUser) {
-      return res.status(400).json({
-        message: "Owner already exists",
+      return res.status(409).json({
+        success: false,
+        message: "An account with this email already exists",
       });
     }
+
+    // -------------------------------------------------
+    // HASH PASSWORD
+    // -------------------------------------------------
 
     const hashedPassword = await bcrypt.hash(
       ownerPassword,
       10
     );
 
+    // -------------------------------------------------
     // CREATE OWNER
+    // -------------------------------------------------
 
     const owner = await User.create({
-      name: ownerName,
-      email: ownerEmail,
+      name: ownerName.trim(),
+      email: cleanEmail,
       password: hashedPassword,
+
       role: "owner",
+
+      // Admin-created owner must change password
       mustChangePassword: true,
+
       accountStatus: "active",
+
+      // This is an admin-created account
+      createdBy: "admin",
+
+      // Hotel is linked immediately after creation
+      hotelId: null,
     });
 
+    // -------------------------------------------------
     // CREATE HOTEL
+    // -------------------------------------------------
 
-    const hotel = await Hotel.create({
-      name: hotelName,
-      address,
-      phone,
-      owner: owner._id,
-      setupCompleted: false,
-      isActive: true,
-    });
+    let hotel;
 
-    // LINK HOTEL TO OWNER
+    try {
+      hotel = await Hotel.create({
+        name: hotelName.trim(),
+
+        address: address?.trim() || "",
+        phone: phone?.trim() || "",
+
+        owner: owner._id,
+
+        // Owner still needs to complete hotel setup
+        setupCompleted: false,
+
+        // Hotel is active unless superadmin deactivates it
+        isActive: true,
+      });
+    } catch (hotelError) {
+      // Prevent orphan owner if hotel creation fails
+      await User.findByIdAndDelete(owner._id);
+
+      throw hotelError;
+    }
+
+    // -------------------------------------------------
+    // LINK OWNER → HOTEL
+    // -------------------------------------------------
 
     owner.hotelId = hotel._id;
 
     await owner.save();
 
-    const populatedHotel =
-      await Hotel.findById(hotel._id).populate(
-        "owner",
-        "name email"
-      );
+    // -------------------------------------------------
+    // POPULATE RESPONSE
+    // -------------------------------------------------
 
-    res.status(201).json({
+    const populatedHotel = await Hotel.findById(
+      hotel._id
+    ).populate(
+      "owner",
+      "name email accountStatus"
+    );
+
+    // -------------------------------------------------
+    // RESPONSE
+    // -------------------------------------------------
+
+    return res.status(201).json({
+      success: true,
+
       message: "Hotel created successfully",
 
       hotel: populatedHotel,
 
       owner: {
+        id: owner._id,
         name: owner.name,
         email: owner.email,
+        role: owner.role,
+        hotelId: owner.hotelId,
+        accountStatus: owner.accountStatus,
+        mustChangePassword: owner.mustChangePassword,
       },
     });
 
   } catch (err) {
-    console.log(
-      "CREATE HOTEL ERROR",
+    console.error(
+      "CREATE HOTEL ERROR:",
       err
     );
 
-    res.status(500).json({
-      message: err.message,
+    return res.status(500).json({
+      success: false,
+      message:
+        err.message ||
+        "Failed to create hotel",
     });
   }
 };
@@ -106,7 +175,6 @@ export const createHotelWithOwner = async (req, res) => {
 
 export const getAllHotels = async (req, res) => {
   try {
-
     const hotels = await Hotel.find()
       .populate(
         "owner",
@@ -116,17 +184,22 @@ export const getAllHotels = async (req, res) => {
         createdAt: -1,
       });
 
-    res.json(hotels);
+    return res.status(200).json({
+      success: true,
+      hotels,
+    });
 
   } catch (err) {
-
-    console.log(
-      "GET HOTELS ERROR",
+    console.error(
+      "GET HOTELS ERROR:",
       err
     );
 
-    res.status(500).json({
-      message: err.message,
+    return res.status(500).json({
+      success: false,
+      message:
+        err.message ||
+        "Failed to fetch hotels",
     });
   }
 };
@@ -137,14 +210,13 @@ export const getAllHotels = async (req, res) => {
 
 export const activateHotel = async (req, res) => {
   try {
-
-    const hotel =
-      await Hotel.findById(
-        req.params.id
-      );
+    const hotel = await Hotel.findById(
+      req.params.id
+    );
 
     if (!hotel) {
       return res.status(404).json({
+        success: false,
         message: "Hotel not found",
       });
     }
@@ -154,16 +226,14 @@ export const activateHotel = async (req, res) => {
 
     await hotel.save();
 
-    // Activate owner account too
+    // Activate owner account
     if (hotel.owner) {
-
       await User.findByIdAndUpdate(
         hotel.owner,
         {
           accountStatus: "active",
         }
       );
-
     }
 
     const updatedHotel =
@@ -174,20 +244,23 @@ export const activateHotel = async (req, res) => {
         "name email accountStatus"
       );
 
-    res.json({
+    return res.status(200).json({
+      success: true,
       message: "Hotel activated successfully",
       hotel: updatedHotel,
     });
 
   } catch (err) {
-
-    console.log(
-      "ACTIVATE HOTEL ERROR",
+    console.error(
+      "ACTIVATE HOTEL ERROR:",
       err
     );
 
-    res.status(500).json({
-      message: err.message,
+    return res.status(500).json({
+      success: false,
+      message:
+        err.message ||
+        "Failed to activate hotel",
     });
   }
 };
@@ -200,16 +273,14 @@ export const deactivateHotel = async (
   req,
   res
 ) => {
-
   try {
-
-    const hotel =
-      await Hotel.findById(
-        req.params.id
-      );
+    const hotel = await Hotel.findById(
+      req.params.id
+    );
 
     if (!hotel) {
       return res.status(404).json({
+        success: false,
         message: "Hotel not found",
       });
     }
@@ -219,16 +290,14 @@ export const deactivateHotel = async (
 
     await hotel.save();
 
-    // Deactivate owner account too
+    // Deactivate owner account
     if (hotel.owner) {
-
       await User.findByIdAndUpdate(
         hotel.owner,
         {
           accountStatus: "inactive",
         }
       );
-
     }
 
     const updatedHotel =
@@ -239,20 +308,23 @@ export const deactivateHotel = async (
         "name email accountStatus"
       );
 
-    res.json({
+    return res.status(200).json({
+      success: true,
       message: "Hotel deactivated successfully",
       hotel: updatedHotel,
     });
 
   } catch (err) {
-
-    console.log(
-      "DEACTIVATE HOTEL ERROR",
+    console.error(
+      "DEACTIVATE HOTEL ERROR:",
       err
     );
 
-    res.status(500).json({
-      message: err.message,
+    return res.status(500).json({
+      success: false,
+      message:
+        err.message ||
+        "Failed to deactivate hotel",
     });
   }
 };
@@ -265,57 +337,65 @@ export const deleteHotel = async (
   req,
   res
 ) => {
-
   try {
-
-    const hotel =
-      await Hotel.findById(
-        req.params.id
-      );
+    const hotel = await Hotel.findById(
+      req.params.id
+    );
 
     if (!hotel) {
       return res.status(404).json({
+        success: false,
         message: "Hotel not found",
       });
     }
 
-    // Delete owner as well
+    // Delete owner
     if (hotel.owner) {
-
       await User.findByIdAndDelete(
         hotel.owner
       );
-
     }
 
     // Delete hotel
     await Hotel.findByIdAndDelete(
-      req.params.id
+      hotel._id
     );
 
-    res.json({
+    return res.status(200).json({
+      success: true,
       message:
         "Hotel and owner deleted successfully",
     });
 
   } catch (err) {
-
-    console.log(
-      "DELETE HOTEL ERROR",
+    console.error(
+      "DELETE HOTEL ERROR:",
       err
     );
 
-    res.status(500).json({
-      message: err.message,
+    return res.status(500).json({
+      success: false,
+      message:
+        err.message ||
+        "Failed to delete hotel",
     });
   }
 };
-export const resetUserPassword = async (req, res) => {
+
+// =====================================================
+// RESET USER PASSWORD
+// =====================================================
+
+export const resetUserPassword = async (
+  req,
+  res
+) => {
   try {
     const { id } = req.params;
 
     if (!id) {
       return res.status(400).json({
+        success: false,
         message: "User ID is required",
       });
     }
@@ -324,38 +404,54 @@ export const resetUserPassword = async (req, res) => {
 
     if (!user) {
       return res.status(404).json({
+        success: false,
         message: "User not found",
       });
     }
 
-    // Super admin should not reset another super admin
+    // Superadmin cannot be reset by another
+    // superadmin through this endpoint
     if (user.role === "superadmin") {
       return res.status(403).json({
-        message: "Super admin password cannot be reset from here",
+        success: false,
+        message:
+          "Super admin password cannot be reset from here",
       });
     }
 
-    // Generate temporary password
+    // -------------------------------------------------
+    // GENERATE TEMPORARY PASSWORD
+    // -------------------------------------------------
+
     const temporaryPassword =
       "FX-" +
       crypto.randomBytes(3).toString("hex") +
       "-" +
       crypto.randomBytes(2).toString("hex");
 
-    // Hash temporary password
+    // -------------------------------------------------
+    // HASH PASSWORD
+    // -------------------------------------------------
+
     user.password = await bcrypt.hash(
       temporaryPassword,
       10
     );
 
-    // Force password change after login
+    // Force user to change password
+    // after next successful login
     user.mustChangePassword = true;
 
     await user.save();
 
-    return res.json({
-      message: "Password reset successfully",
+    return res.status(200).json({
+      success: true,
+
+      message:
+        "Password reset successfully",
+
       temporaryPassword,
+
       user: {
         id: user._id,
         name: user.name,
@@ -363,6 +459,7 @@ export const resetUserPassword = async (req, res) => {
         role: user.role,
       },
     });
+
   } catch (error) {
     console.error(
       "RESET USER PASSWORD ERROR:",
@@ -370,7 +467,9 @@ export const resetUserPassword = async (req, res) => {
     );
 
     return res.status(500).json({
-      message: "Unable to reset user password",
+      success: false,
+      message:
+        "Unable to reset user password",
     });
   }
 };
