@@ -9,21 +9,17 @@ import crypto from "crypto";
 
 export const register = async (req, res) => {
   try {
-    console.log("=================================");
-    console.log("REGISTER REQUEST RECEIVED");
-    console.log("BODY:", {
-      name: req.body?.name,
-      email: req.body?.email,
-      hasPassword: !!req.body?.password,
-      phone: req.body?.phone,
-    });
-    console.log("=================================");
-
     const {
       name,
       email,
+      phone,
       password,
+      hotel,
     } = req.body;
+
+    // =====================================================
+    // OWNER DETAILS
+    // =====================================================
 
     const cleanName = String(name || "").trim();
 
@@ -31,41 +27,80 @@ export const register = async (req, res) => {
       .trim()
       .toLowerCase();
 
+    const cleanPhone = String(phone || "").trim();
+
     const cleanPassword = String(password || "");
 
     if (!cleanName || !cleanEmail || !cleanPassword) {
       return res.status(400).json({
-        message: "Name, email and password are required",
+        success: false,
+        message:
+          "Owner name, email and password are required",
       });
     }
 
     if (cleanPassword.length < 6) {
       return res.status(400).json({
-        message: "Password must be at least 6 characters",
+        success: false,
+        message:
+          "Password must be at least 6 characters",
       });
     }
 
-    const existingUser = await User.findOne({
-      email: cleanEmail,
-    });
+    // =====================================================
+    // HOTEL DETAILS
+    // =====================================================
+
+    if (!hotel || typeof hotel !== "object") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Hotel details are required",
+      });
+    }
+
+    const hotelName = String(
+      hotel.name || ""
+    ).trim();
+
+    if (!hotelName) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Hotel name is required",
+      });
+    }
+
+    // =====================================================
+    // CHECK EXISTING USER
+    // =====================================================
+
+    const existingUser =
+      await User.findOne({
+        email: cleanEmail,
+      });
 
     if (existingUser) {
-      console.log(
-        "REGISTER BLOCKED - EMAIL ALREADY EXISTS:",
-        cleanEmail
-      );
-
       return res.status(409).json({
-        message: "An account with this email already exists",
+        success: false,
+        message:
+          "An account with this email already exists",
       });
     }
 
-    const hashedPassword = await bcrypt.hash(
-      cleanPassword,
-      10
-    );
+    // =====================================================
+    // HASH PASSWORD
+    // =====================================================
 
-    console.log("CREATING SELF-REGISTERED OWNER...");
+    const hashedPassword =
+      await bcrypt.hash(
+        cleanPassword,
+        10
+      );
+
+    // =====================================================
+    // CREATE OWNER
+    // =====================================================
 
     const user = await User.create({
       name: cleanName,
@@ -82,24 +117,111 @@ export const register = async (req, res) => {
 
       mustChangePassword: false,
 
-      // Self registered owner has no hotel yet
       hotelId: null,
     });
 
-    console.log("=================================");
-    console.log("USER CREATED SUCCESSFULLY");
-    console.log("USER ID:", user._id.toString());
-    console.log("EMAIL:", user.email);
-    console.log("ROLE:", user.role);
-    console.log("HOTEL ID:", user.hotelId);
-    console.log("CREATED BY:", user.createdBy);
-    console.log("=================================");
+    console.log(
+      "SELF OWNER CREATED:",
+      user._id.toString()
+    );
+
+    // =====================================================
+    // CREATE HOTEL
+    // =====================================================
+
+    const newHotel = await Hotel.create({
+      owner: user._id,
+
+      name: hotelName,
+
+      tagline:
+        String(
+          hotel.tagline || ""
+        ).trim(),
+
+      description:
+        String(
+          hotel.description || ""
+        ).trim(),
+
+      type:
+        hotel.type ||
+        "hotel",
+
+      address:
+        String(
+          hotel.address || ""
+        ).trim(),
+
+      phone:
+        String(
+          hotel.phone || cleanPhone
+        ).trim(),
+
+      email:
+        String(
+          hotel.email || cleanEmail
+        ).trim()
+        .toLowerCase(),
+
+      website:
+        String(
+          hotel.website || ""
+        ).trim(),
+
+      instagram:
+        String(
+          hotel.instagram || ""
+        ).trim(),
+
+      whatsapp:
+        String(
+          hotel.whatsapp || ""
+        ).trim(),
+
+      setupCompleted: true,
+
+      isActive: true,
+
+      // Hotel schema already provides these defaults,
+      // but we explicitly set the default theme here.
+      theme: {
+        id: "stormy_morning",
+        primary: "#64748B",
+        secondary: "#0F172A",
+        accent: "#94A3B8",
+        text: "#E6EEF8",
+        mode: "dark",
+      },
+    });
+
+    console.log(
+      "SELF HOTEL CREATED:",
+      newHotel._id.toString()
+    );
+
+    // =====================================================
+    // CONNECT OWNER → HOTEL
+    // =====================================================
+
+    user.hotelId = newHotel._id;
+
+    await user.save();
+
+    console.log(
+      "OWNER LINKED TO HOTEL:",
+      user.hotelId.toString()
+    );
+
+    // =====================================================
+    // CREATE JWT
+    // =====================================================
 
     const token = jwt.sign(
       {
         id: user._id,
         role: user.role,
-        hotelId: null,
+        hotelId: newHotel._id,
       },
       process.env.JWT_SECRET,
       {
@@ -107,12 +229,19 @@ export const register = async (req, res) => {
       }
     );
 
+    // =====================================================
+    // RESPONSE
+    // =====================================================
+
     return res.status(201).json({
       success: true,
 
-      message: "Owner registration successful",
+      message:
+        "Owner and hotel registration successful",
 
       token,
+
+      hotelSetupCompleted: true,
 
       user: {
         id: user._id,
@@ -120,27 +249,32 @@ export const register = async (req, res) => {
         email: user.email,
         role: user.role,
 
-        // Important for frontend
-        hotelId: null,
+        hotelId: newHotel._id,
 
-        accountStatus: user.accountStatus,
-        subscriptionPlan: user.subscriptionPlan,
-        createdBy: user.createdBy,
+        accountStatus:
+          user.accountStatus,
+
+        subscriptionPlan:
+          user.subscriptionPlan,
+
+        createdBy:
+          user.createdBy,
+
+        hotel: newHotel,
       },
     });
 
   } catch (err) {
-    console.error("=================================");
-    console.error("OWNER REGISTRATION ERROR");
-    console.error("MESSAGE:", err.message);
-    console.error("NAME:", err.name);
-    console.error("CODE:", err.code);
-    console.error("ERROR:", err);
-    console.error("=================================");
+    console.error(
+      "OWNER + HOTEL REGISTRATION ERROR:",
+      err
+    );
 
     return res.status(500).json({
       success: false,
-      message: err.message || "Registration failed",
+      message:
+        err.message ||
+        "Registration failed",
     });
   }
 };
