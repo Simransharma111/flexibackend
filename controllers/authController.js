@@ -9,6 +9,16 @@ import crypto from "crypto";
 
 export const register = async (req, res) => {
   try {
+    console.log("=================================");
+    console.log("REGISTER REQUEST RECEIVED");
+    console.log("BODY:", {
+      name: req.body?.name,
+      email: req.body?.email,
+      hasPassword: !!req.body?.password,
+      phone: req.body?.phone,
+    });
+    console.log("=================================");
+
     const {
       name,
       email,
@@ -16,62 +26,74 @@ export const register = async (req, res) => {
     } = req.body;
 
     const cleanName = String(name || "").trim();
+
     const cleanEmail = String(email || "")
       .trim()
       .toLowerCase();
+
     const cleanPassword = String(password || "");
 
-    if (
-      !cleanName ||
-      !cleanEmail ||
-      !cleanPassword
-    ) {
+    if (!cleanName || !cleanEmail || !cleanPassword) {
       return res.status(400).json({
-        message:
-          "Name, email and password are required",
+        message: "Name, email and password are required",
       });
     }
 
     if (cleanPassword.length < 6) {
       return res.status(400).json({
-        message:
-          "Password must be at least 6 characters",
+        message: "Password must be at least 6 characters",
       });
     }
 
-    const existingUser =
-      await User.findOne({
-        email: cleanEmail,
-      });
+    const existingUser = await User.findOne({
+      email: cleanEmail,
+    });
 
     if (existingUser) {
+      console.log(
+        "REGISTER BLOCKED - EMAIL ALREADY EXISTS:",
+        cleanEmail
+      );
+
       return res.status(409).json({
-        message:
-          "An account with this email already exists",
+        message: "An account with this email already exists",
       });
     }
 
-    const hashedPassword =
-      await bcrypt.hash(
-        cleanPassword,
-        10
-      );
+    const hashedPassword = await bcrypt.hash(
+      cleanPassword,
+      10
+    );
+
+    console.log("CREATING SELF-REGISTERED OWNER...");
 
     const user = await User.create({
       name: cleanName,
       email: cleanEmail,
       password: hashedPassword,
+
       role: "owner",
+
       accountStatus: "active",
+
       subscriptionPlan: "trial",
+
       createdBy: "self",
+
       mustChangePassword: false,
+
+      // Self registered owner has no hotel yet
       hotelId: null,
     });
 
-    // =====================================================
-    // AUTOMATIC LOGIN AFTER REGISTRATION
-    // =====================================================
+    console.log("=================================");
+    console.log("USER CREATED SUCCESSFULLY");
+    console.log("USER ID:", user._id.toString());
+    console.log("EMAIL:", user.email);
+    console.log("ROLE:", user.role);
+    console.log("HOTEL ID:", user.hotelId);
+    console.log("CREATED BY:", user.createdBy);
+    console.log("=================================");
 
     const token = jwt.sign(
       {
@@ -85,14 +107,10 @@ export const register = async (req, res) => {
       }
     );
 
-    console.log(
-      "OWNER REGISTERED:",
-      user.email
-    );
-
     return res.status(201).json({
-      message:
-        "Owner registration successful",
+      success: true,
+
+      message: "Owner registration successful",
 
       token,
 
@@ -101,30 +119,31 @@ export const register = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        accountStatus:
-          user.accountStatus,
-        subscriptionPlan:
-          user.subscriptionPlan,
-        createdBy:
-          user.createdBy,
-        hotel: null,
+
+        // Important for frontend
+        hotelId: null,
+
+        accountStatus: user.accountStatus,
+        subscriptionPlan: user.subscriptionPlan,
+        createdBy: user.createdBy,
       },
     });
 
   } catch (err) {
-    console.error(
-      "OWNER REGISTRATION ERROR:",
-      err
-    );
+    console.error("=================================");
+    console.error("OWNER REGISTRATION ERROR");
+    console.error("MESSAGE:", err.message);
+    console.error("NAME:", err.name);
+    console.error("CODE:", err.code);
+    console.error("ERROR:", err);
+    console.error("=================================");
 
     return res.status(500).json({
-      message:
-        err.message ||
-        "Registration failed",
+      success: false,
+      message: err.message || "Registration failed",
     });
   }
 };
-
 
 export const login = async (req, res) => {
   try {
