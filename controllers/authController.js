@@ -2,6 +2,7 @@ import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import Hotel from "../models/Hotel.js";
 // import transporter from "../config/mail.js";
 
 
@@ -16,6 +17,11 @@ export const register = async (req, res) => {
       password,
       hotel,
     } = req.body;
+
+    console.log("================================");
+    console.log("SELF REGISTRATION REQUEST");
+    console.log("BODY:", req.body);
+    console.log("================================");
 
     // =====================================================
     // OWNER DETAILS
@@ -34,16 +40,14 @@ export const register = async (req, res) => {
     if (!cleanName || !cleanEmail || !cleanPassword) {
       return res.status(400).json({
         success: false,
-        message:
-          "Owner name, email and password are required",
+        message: "Owner name, email and password are required",
       });
     }
 
     if (cleanPassword.length < 6) {
       return res.status(400).json({
         success: false,
-        message:
-          "Password must be at least 6 characters",
+        message: "Password must be at least 6 characters",
       });
     }
 
@@ -54,20 +58,16 @@ export const register = async (req, res) => {
     if (!hotel || typeof hotel !== "object") {
       return res.status(400).json({
         success: false,
-        message:
-          "Hotel details are required",
+        message: "Hotel details are required",
       });
     }
 
-    const hotelName = String(
-      hotel.name || ""
-    ).trim();
+    const hotelName = String(hotel.name || "").trim();
 
     if (!hotelName) {
       return res.status(400).json({
         success: false,
-        message:
-          "Hotel name is required",
+        message: "Hotel name is required",
       });
     }
 
@@ -75,16 +75,14 @@ export const register = async (req, res) => {
     // CHECK EXISTING USER
     // =====================================================
 
-    const existingUser =
-      await User.findOne({
-        email: cleanEmail,
-      });
+    const existingUser = await User.findOne({
+      email: cleanEmail,
+    });
 
     if (existingUser) {
       return res.status(409).json({
         success: false,
-        message:
-          "An account with this email already exists",
+        message: "An account with this email already exists",
       });
     }
 
@@ -92,11 +90,10 @@ export const register = async (req, res) => {
     // HASH PASSWORD
     // =====================================================
 
-    const hashedPassword =
-      await bcrypt.hash(
-        cleanPassword,
-        10
-      );
+    const hashedPassword = await bcrypt.hash(
+      cleanPassword,
+      10
+    );
 
     // =====================================================
     // CREATE OWNER
@@ -121,7 +118,7 @@ export const register = async (req, res) => {
     });
 
     console.log(
-      "SELF OWNER CREATED:",
+      "OWNER CREATED:",
       user._id.toString()
     );
 
@@ -129,79 +126,81 @@ export const register = async (req, res) => {
     // CREATE HOTEL
     // =====================================================
 
-    const newHotel = await Hotel.create({
-      owner: user._id,
+    let newHotel;
 
-      name: hotelName,
+    try {
+      newHotel = await Hotel.create({
+        owner: user._id,
 
-      tagline:
-        String(
+        name: hotelName,
+
+        tagline: String(
           hotel.tagline || ""
         ).trim(),
 
-      description:
-        String(
+        description: String(
           hotel.description || ""
         ).trim(),
 
-      type:
-        hotel.type ||
-        "hotel",
+        type:
+          hotel.type ||
+          "hotel",
 
-      address:
-        String(
+        address: String(
           hotel.address || ""
         ).trim(),
 
-      phone:
-        String(
+        phone: String(
           hotel.phone || cleanPhone
         ).trim(),
 
-      email:
-        String(
+        email: String(
           hotel.email || cleanEmail
-        ).trim()
-        .toLowerCase(),
+        )
+          .trim()
+          .toLowerCase(),
 
-      website:
-        String(
+        website: String(
           hotel.website || ""
         ).trim(),
 
-      instagram:
-        String(
+        instagram: String(
           hotel.instagram || ""
         ).trim(),
 
-      whatsapp:
-        String(
+        whatsapp: String(
           hotel.whatsapp || ""
         ).trim(),
 
-      setupCompleted: true,
+        setupCompleted: true,
 
-      isActive: true,
+        isActive: true,
 
-      // Hotel schema already provides these defaults,
-      // but we explicitly set the default theme here.
-      theme: {
-        id: "stormy_morning",
-        primary: "#64748B",
-        secondary: "#0F172A",
-        accent: "#94A3B8",
-        text: "#E6EEF8",
-        mode: "dark",
-      },
-    });
+        theme: {
+          id: "stormy_morning",
+          primary: "#64748B",
+          secondary: "#0F172A",
+          accent: "#94A3B8",
+          text: "#E6EEF8",
+          mode: "dark",
+        },
+      });
+    } catch (hotelError) {
+      // If hotel creation fails, remove the owner
+      // so we don't leave an orphan owner account.
+
+      await User.findByIdAndDelete(user._id);
+
+      throw hotelError;
+    }
 
     console.log(
-      "SELF HOTEL CREATED:",
+      "HOTEL CREATED:",
       newHotel._id.toString()
     );
 
     // =====================================================
-    // CONNECT OWNER → HOTEL
+    // LINK OWNER → HOTEL
     // =====================================================
 
     user.hotelId = newHotel._id;
@@ -236,8 +235,7 @@ export const register = async (req, res) => {
     return res.status(201).json({
       success: true,
 
-      message:
-        "Owner and hotel registration successful",
+      message: "Owner and hotel registration successful",
 
       token,
 
@@ -251,8 +249,7 @@ export const register = async (req, res) => {
 
         hotelId: newHotel._id,
 
-        accountStatus:
-          user.accountStatus,
+        accountStatus: user.accountStatus,
 
         subscriptionPlan:
           user.subscriptionPlan,
@@ -265,10 +262,11 @@ export const register = async (req, res) => {
     });
 
   } catch (err) {
-    console.error(
-      "OWNER + HOTEL REGISTRATION ERROR:",
-      err
-    );
+    console.error("================================");
+    console.error("OWNER + HOTEL REGISTRATION ERROR");
+    console.error(err);
+    console.error("MESSAGE:", err.message);
+    console.error("================================");
 
     return res.status(500).json({
       success: false,
@@ -278,7 +276,6 @@ export const register = async (req, res) => {
     });
   }
 };
-
 export const login = async (req, res) => {
   try {
     const {
