@@ -36,9 +36,9 @@ const auth = async (req, res, next) => {
       });
     }
 
-    const user = await User.findById(decoded.id).select(
-      "_id role hotelId accountStatus"
-    );
+    const user = await User.findById(
+      decoded.id
+    ).populate("hotelId");
 
     if (!user) {
       return res.status(401).json({
@@ -47,17 +47,53 @@ const auth = async (req, res, next) => {
       });
     }
 
+    // =====================================================
+    // ACCOUNT STATUS
+    // =====================================================
+
+    if (user.accountStatus === "inactive") {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Your account has been deactivated. Please contact the administrator.",
+      });
+    }
+
+    // =====================================================
+    // HOTEL STATUS
+    // Superadmin does not need a hotel
+    // =====================================================
+
+    if (
+      user.role !== "superadmin" &&
+      user.hotelId &&
+      user.hotelId.isActive === false
+    ) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Your hotel account is currently inactive. Please contact the administrator.",
+      });
+    }
+
+    // =====================================================
+    // REQUEST USER
+    // =====================================================
+
     req.user = {
       id: user._id,
       role: user.role,
-      hotelId: user.hotelId || null,
+      hotelId: user.hotelId?._id || null,
       accountStatus: user.accountStatus,
     };
 
     next();
 
   } catch (err) {
-    console.error("AUTH ERROR:", err.message);
+    console.error(
+      "AUTH ERROR:",
+      err.message
+    );
 
     return res.status(401).json({
       success: false,
