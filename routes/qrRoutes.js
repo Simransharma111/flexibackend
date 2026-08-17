@@ -4,7 +4,7 @@ import {
   generateQRCodes,
   getQRMenu,
   toggleQRStatus,
-  removeQRAssignment,
+  removeQRAssignment,registerExistingQR
 } from "../controllers/qrController.js";
 
 import auth from "../middlewares/auth.js";
@@ -48,6 +48,11 @@ router.put(
   "/remove-qr",
   auth,
   removeQRAssignment
+);
+router.post(
+  "/register",
+  auth,
+  registerExistingQR
 );
 
 export default router;
