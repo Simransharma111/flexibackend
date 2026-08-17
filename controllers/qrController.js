@@ -435,3 +435,73 @@ export const removeQRAssignment = async (req, res) => {
     });
   }
 };
+// =====================================================
+// REGISTER EXISTING / OLD QR
+// =====================================================
+
+export const registerExistingQR = async (req, res) => {
+  try {
+
+    const { qrId } = req.body;
+
+    if (!qrId || !qrId.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "QR ID is required",
+      });
+    }
+
+    const cleanQrId = qrId.trim();
+
+    // ----------------------------------------
+    // CHECK IF ALREADY REGISTERED
+    // ----------------------------------------
+
+    const existingQR = await QR.findOne({
+      qrId: cleanQrId,
+    });
+
+    if (existingQR) {
+      return res.status(200).json({
+        success: true,
+        alreadyExists: true,
+        message: "QR code is already registered",
+        qr: existingQR,
+      });
+    }
+
+    // ----------------------------------------
+    // CREATE QR RECORD
+    // ----------------------------------------
+
+    const qr = await QR.create({
+      qrId: cleanQrId,
+      assigned: false,
+      hotelId: null,
+      tableId: null,
+      tableNumber: null,
+      isActive: true,
+    });
+
+    return res.status(201).json({
+      success: true,
+      alreadyExists: false,
+      message: "Existing QR registered successfully",
+      qr,
+    });
+
+  } catch (err) {
+
+    console.error(
+      "REGISTER EXISTING QR ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        err.message ||
+        "Failed to register existing QR",
+    });
+  }
+};
