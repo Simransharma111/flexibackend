@@ -82,126 +82,159 @@ export const generateQRCodes = async (req, res) => {
 // =====================================================
 
 export const getQRMenu = async (req, res) => {
-
   try {
-
     const { qrId } = req.params;
 
-    console.log(
-      "================================="
-    );
+    console.log("=================================");
+    console.log("GUEST QR REQUEST");
+    console.log("QR ID:", qrId);
 
-    console.log(
-      "GUEST QR REQUEST"
-    );
-
-    console.log(
-      "QR ID:",
-      qrId
-    );
-
-    // -------------------------------------------------
-    // CHECK QR
-    // -------------------------------------------------
+    // =====================================================
+    // FIND QR
+    // =====================================================
 
     const qr = await QR.findOne({
-      qrId,
+      qrId: qrId?.trim(),
     });
 
     if (!qr) {
-
-      console.log(
-        "QR NOT FOUND IN QR COLLECTION"
-      );
+      console.log("QR NOT FOUND");
 
       return res.status(404).json({
         success: false,
         message: "QR code not found",
       });
-
     }
 
-    if (qr.isActive === false) {
+    // =====================================================
+    // CHECK QR STATUS
+    // =====================================================
 
+    if (qr.isActive === false) {
       return res.status(403).json({
         success: false,
         message: "This QR code is disabled",
       });
-
     }
 
-    // -------------------------------------------------
-    // FIND TABLE USING QR
-    // -------------------------------------------------
+    // =====================================================
+    // FIND TABLE / ROOM
+    // =====================================================
+    // FIRST:
+    // Use QR.tableId from the new structure.
+    //
+    // FALLBACK:
+    // Use Table.qrId for old QR records.
+    // =====================================================
 
-    const table =
-      await Table.findOne({
-        qrId,
+    let table = null;
+
+    // -----------------------------------------------------
+    // NEW METHOD
+    // -----------------------------------------------------
+
+    if (qr.tableId) {
+      table = await Table.findOne({
+        _id: qr.tableId,
+        hotelId: qr.hotelId,
       });
+    }
 
-    console.log(
-      "TABLE:",
-      table
-    );
+    // -----------------------------------------------------
+    // OLD QR COMPATIBILITY
+    // -----------------------------------------------------
 
     if (!table) {
+      table = await Table.findOne({
+        qrId: qr.qrId,
+      });
+    }
 
+    // -----------------------------------------------------
+    // NO TABLE FOUND
+    // -----------------------------------------------------
+
+    if (!table) {
       return res.status(404).json({
         success: false,
         message:
           "This QR code is not assigned to any table or room",
       });
-
     }
 
-    // -------------------------------------------------
-    // FIND HOTEL
-    // -------------------------------------------------
+    // =====================================================
+    // REPAIR OLD QR DATA
+    // =====================================================
+    // If this QR came from the old Table.qrId relationship,
+    // update the QR document with the current assignment.
+    // =====================================================
 
-    const hotel =
-      await Hotel.findById(
-        table.hotelId
+    const needsRepair =
+      !qr.assigned ||
+      !qr.hotelId ||
+      !qr.tableId ||
+      !qr.tableNumber;
+
+    if (needsRepair) {
+      qr.assigned = true;
+      qr.hotelId = table.hotelId;
+      qr.tableId = table._id;
+      qr.tableNumber = table.tableNumber;
+
+      await qr.save();
+
+      console.log(
+        "OLD QR DATA REPAIRED:",
+        qr.qrId
       );
+    }
+
+    // =====================================================
+    // FIND HOTEL
+    // =====================================================
+
+    const hotel = await Hotel.findById(
+      table.hotelId
+    );
 
     if (!hotel) {
-
       return res.status(404).json({
         success: false,
-        message:
-          "Hotel not found",
+        message: "Hotel not found",
       });
-
     }
 
-    // -------------------------------------------------
+    // =====================================================
     // FIND MENU
-    // -------------------------------------------------
+    // =====================================================
 
-    const dishes =
-      await Menu.find({
-        hotelId: table.hotelId,
+    const dishes = await Menu.find({
+      hotelId: table.hotelId,
 
-        $or: [
-          {
-            isAvailable: true,
+      $or: [
+        {
+          isAvailable: true,
+        },
+        {
+          isAvailable: {
+            $exists: false,
           },
-          {
-            isAvailable: {
-              $exists: false,
-            },
-          },
-        ],
-      })
-      .sort({
-        displayOrder: 1,
-        featured: -1,
-        todaySpecial: -1,
-        isPopular: -1,
-        isBestseller: -1,
-        isRecommended: -1,
-        isNewArrival: -1,
-        createdAt: -1,
-      });
+        },
+      ],
+    }).sort({
+      displayOrder: 1,
+      featured: -1,
+      todaySpecial: -1,
+      isPopular: -1,
+      isBestseller: -1,
+      isRecommended: -1,
+      isNewArrival: -1,
+      createdAt: -1,
+    });
+
+    // =====================================================
+    // LOG
+    // =====================================================
 
     console.log(
       "HOTEL:",
@@ -209,7 +242,9 @@ export const getQRMenu = async (req, res) => {
     );
 
     console.log(
-      "TABLE:",
+      table.type === "room"
+        ? "ROOM:"
+        : "TABLE:",
       table.tableNumber
     );
 
@@ -222,26 +257,19 @@ export const getQRMenu = async (req, res) => {
       "================================="
     );
 
-    // -------------------------------------------------
+    // =====================================================
     // RESPONSE
-    // -------------------------------------------------
+    // =====================================================
 
     return res.status(200).json({
-
       success: true,
-
       qrId,
-
       hotel,
-
       table,
-
       dishes,
-
     });
 
   } catch (err) {
-
     console.error(
       "GET QR MENU ERROR:",
       err
@@ -253,9 +281,7 @@ export const getQRMenu = async (req, res) => {
         err.message ||
         "Failed to load QR menu",
     });
-
   }
-
 };
 
 

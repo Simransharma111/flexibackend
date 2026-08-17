@@ -8,7 +8,6 @@ export const createTable = async (req, res) => {
   try {
     const { tableNumber, type } = req.body;
 
-    // Check hotel
     if (!req.user?.hotelId) {
       return res.status(400).json({
         success: false,
@@ -16,7 +15,6 @@ export const createTable = async (req, res) => {
       });
     }
 
-    // Check table number
     if (!tableNumber) {
       return res.status(400).json({
         success: false,
@@ -24,7 +22,6 @@ export const createTable = async (req, res) => {
       });
     }
 
-    // Check type
     if (!["table", "room"].includes(type)) {
       return res.status(400).json({
         success: false,
@@ -32,31 +29,38 @@ export const createTable = async (req, res) => {
       });
     }
 
-    // Prevent duplicate table/room
+    const cleanNumber = String(tableNumber).trim();
+
     const existingTable = await Table.findOne({
       hotelId: req.user.hotelId,
-      tableNumber: String(tableNumber).trim(),
+      tableNumber: cleanNumber,
       type,
     });
 
     if (existingTable) {
       return res.status(400).json({
         success: false,
-        message: `${type === "room" ? "Room" : "Table"} ${tableNumber} already exists`,
+        message: `${
+          type === "room" ? "Room" : "Table"
+        } ${cleanNumber} already exists`,
       });
     }
 
     const table = await Table.create({
       hotelId: req.user.hotelId,
-      tableNumber: String(tableNumber).trim(),
+      tableNumber: cleanNumber,
       type,
+      qrId: null,
     });
 
     return res.status(201).json({
       success: true,
-      message: `${type === "room" ? "Room" : "Table"} created successfully`,
+      message: `${
+        type === "room" ? "Room" : "Table"
+      } created successfully`,
       table,
     });
+
   } catch (err) {
     console.error("CREATE TABLE ERROR:", err);
 
@@ -73,6 +77,7 @@ export const createTable = async (req, res) => {
 // ========================================
 export const getTables = async (req, res) => {
   try {
+
     if (!req.user?.hotelId) {
       return res.status(400).json({
         success: false,
@@ -90,25 +95,27 @@ export const getTables = async (req, res) => {
       success: true,
       tables,
     });
+
   } catch (err) {
+
     console.error("GET TABLES ERROR:", err);
 
     return res.status(500).json({
       success: false,
       message: err.message,
     });
+
   }
 };
 
 
 // ========================================
-// ASSIGN QR
-// ========================================
-// ========================================
 // ASSIGN / REASSIGN QR
 // ========================================
 export const assignQRToTable = async (req, res) => {
+
   try {
+
     const { tableId, qrId } = req.body;
 
     if (!tableId || !qrId) {
@@ -118,26 +125,39 @@ export const assignQRToTable = async (req, res) => {
       });
     }
 
+    const hotelId = req.user?.hotelId;
+
+    if (!hotelId) {
+      return res.status(400).json({
+        success: false,
+        message: "User is not assigned to a hotel",
+      });
+    }
+
     // ----------------------------------------
-    // FIND TABLE BELONGING TO CURRENT HOTEL
+    // FIND TABLE
     // ----------------------------------------
+
     const table = await Table.findOne({
       _id: tableId,
-      hotelId: req.user.hotelId,
+      hotelId,
     });
 
     if (!table) {
       return res.status(404).json({
         success: false,
-        message: "Table not found",
+        message: "Table or room not found",
       });
     }
 
     // ----------------------------------------
     // FIND QR
     // ----------------------------------------
+
+    const cleanQrId = qrId.trim();
+
     const qr = await QR.findOne({
-      qrId: qrId.trim(),
+      qrId: cleanQrId,
     });
 
     if (!qr) {
@@ -148,70 +168,101 @@ export const assignQRToTable = async (req, res) => {
     }
 
     // ----------------------------------------
-    // PREVENT USING QR FROM ANOTHER HOTEL
+    // QR BELONGS TO ANOTHER HOTEL
     // ----------------------------------------
+
     if (
-      qr.assigned &&
       qr.hotelId &&
-      qr.hotelId.toString() !== req.user.hotelId.toString()
+      qr.hotelId.toString() !== hotelId.toString()
     ) {
+
       return res.status(403).json({
         success: false,
         message: "This QR code belongs to another hotel",
       });
+
     }
 
     // ----------------------------------------
-    // IF THIS TABLE ALREADY HAS ANOTHER QR
-    // RELEASE OLD QR
+    // SAME QR ALREADY ASSIGNED TO THIS TABLE
     // ----------------------------------------
+
     if (
-      table.qrId &&
-      table.qrId !== qr.qrId
+      qr.assigned &&
+      qr.tableId &&
+      qr.tableId.toString() === table._id.toString()
     ) {
-      const oldQR = await QR.findOne({
-        qrId: table.qrId,
+
+      return res.status(200).json({
+        success: true,
+        message: "QR is already assigned to this table or room",
+        table,
+        qr,
       });
 
-      if (oldQR) {
-        oldQR.assigned = false;
-        oldQR.hotelId = null;
-        oldQR.tableId = null;
-        oldQR.tableNumber = null;
-
-        await oldQR.save();
-      }
     }
 
     // ----------------------------------------
-    // IF QR IS ALREADY ASSIGNED TO ANOTHER
-    // TABLE IN SAME HOTEL
+    // IF QR IS ASSIGNED SOMEWHERE ELSE
     // ----------------------------------------
+
     if (
       qr.assigned &&
       qr.tableId &&
       qr.tableId.toString() !== table._id.toString()
     ) {
+
       return res.status(400).json({
         success: false,
-        message: "This QR is already assigned to another table or room",
+        message:
+          "This QR is already assigned to another table or room",
       });
+
     }
 
     // ----------------------------------------
-    // ASSIGN QR TO TABLE
+    // RELEASE CURRENT QR FROM THIS TABLE
     // ----------------------------------------
 
-    table.qrId = qr.qrId;
+    if (
+      table.qrId &&
+      table.qrId !== cleanQrId
+    ) {
+
+      const oldQR = await QR.findOne({
+        qrId: table.qrId,
+      });
+
+      if (oldQR) {
+
+        oldQR.assigned = false;
+
+        // Keep QR itself alive.
+        // It can be assigned again later.
+        oldQR.hotelId = null;
+        oldQR.tableId = null;
+        oldQR.tableNumber = null;
+
+        await oldQR.save();
+
+      }
+
+    }
+
+    // ----------------------------------------
+    // ASSIGN NEW QR TO TABLE
+    // ----------------------------------------
+
+    table.qrId = cleanQrId;
 
     await table.save();
 
     // ----------------------------------------
-    // UPDATE QR OWNERSHIP
+    // UPDATE QR
     // ----------------------------------------
 
     qr.assigned = true;
-    qr.hotelId = req.user.hotelId;
+    qr.hotelId = hotelId;
     qr.tableId = table._id;
     qr.tableNumber = table.tableNumber;
     qr.isActive = true;
@@ -230,11 +281,14 @@ export const assignQRToTable = async (req, res) => {
     });
 
   } catch (err) {
+
     console.error("ASSIGN QR ERROR:", err);
 
     return res.status(500).json({
       success: false,
-      message: err.message,
+      message: err.message || "Failed to assign QR",
     });
+
   }
+
 };
