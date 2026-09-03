@@ -162,6 +162,36 @@ const hotelSchema = new mongoose.Schema(
     },
 
     // =========================
+// CUSTOMER MENU SETTINGS
+// =========================
+
+menuMode: {
+  type: String,
+  enum: ["visual", "simple"],
+  default: "visual",
+},
+
+orderingEnabled: {
+  type: Boolean,
+  default: true,
+},
+
+// =========================
+// GST SETTINGS
+// =========================
+
+gstEnabled: {
+  type: Boolean,
+  default: false,
+},
+
+gstPercentage: {
+  type: Number,
+  default: 0,
+  min: 0,
+  max: 100,
+},
+    // =========================
     // THEME
     // =========================
 
@@ -191,6 +221,8 @@ const hotelSchema = new mongoose.Schema(
         default: "dark",
       },
     },
+
+    
 
     // =========================
     // OWNER

@@ -422,33 +422,175 @@ export const updateHotelProfile = async (req, res) => {
       });
     }
 
-    hotel.tagline = req.body.tagline ?? hotel.tagline;
-    hotel.description = req.body.description ?? hotel.description;
+    // =========================
+    // BASIC INFORMATION
+    // =========================
 
-    hotel.address = req.body.address ?? hotel.address;
-    hotel.phone = req.body.phone ?? hotel.phone;
-    hotel.email = req.body.email ?? hotel.email;
-    hotel.website = req.body.website ?? hotel.website;
-    hotel.instagram = req.body.instagram ?? hotel.instagram;
-    hotel.whatsapp = req.body.whatsapp ?? hotel.whatsapp;
+    if (req.body.name !== undefined) {
+      hotel.name = String(req.body.name).trim();
+    }
+
+    if (req.body.tagline !== undefined) {
+      hotel.tagline = req.body.tagline;
+    }
+
+    if (req.body.description !== undefined) {
+      hotel.description = req.body.description;
+    }
+
+    if (req.body.address !== undefined) {
+      hotel.address = req.body.address;
+    }
+
+    if (req.body.phone !== undefined) {
+      hotel.phone = req.body.phone;
+    }
+
+    if (req.body.email !== undefined) {
+      hotel.email = req.body.email;
+    }
+
+    if (req.body.website !== undefined) {
+      hotel.website = req.body.website;
+    }
+
+    if (req.body.instagram !== undefined) {
+      hotel.instagram = req.body.instagram;
+    }
+
+    if (req.body.whatsapp !== undefined) {
+      hotel.whatsapp = req.body.whatsapp;
+    }
+
+    // =========================
+    // CUSTOMER MENU SETTINGS
+    // =========================
+
+    if (
+      req.body.menuMode !== undefined
+    ) {
+      if (
+        !["visual", "simple"].includes(
+          req.body.menuMode
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "menuMode must be visual or simple",
+        });
+      }
+
+      hotel.menuMode = req.body.menuMode;
+    }
+
+    if (
+      req.body.orderingEnabled !== undefined
+    ) {
+      hotel.orderingEnabled =
+        req.body.orderingEnabled === true ||
+        req.body.orderingEnabled === "true";
+    }
+
+    // =========================
+    // GST SETTINGS
+    // =========================
+
+    if (
+      req.body.gstEnabled !== undefined
+    ) {
+      hotel.gstEnabled =
+        req.body.gstEnabled === true ||
+        req.body.gstEnabled === "true";
+    }
+
+    if (
+      req.body.gstPercentage !== undefined
+    ) {
+      const gstPercentage = Number(
+        req.body.gstPercentage
+      );
+
+      if (
+        !Number.isFinite(gstPercentage) ||
+        gstPercentage < 0 ||
+        gstPercentage > 100
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "GST percentage must be between 0 and 100",
+        });
+      }
+
+      hotel.gstPercentage = gstPercentage;
+    }
+
+    // =========================
+    // FEATURE SETTINGS
+    // =========================
+
+    if (
+      req.body.featureSettings !== undefined
+    ) {
+      hotel.featureSettings =
+        req.body.featureSettings;
+    }
+
+    if (
+      req.body.appLevel !== undefined
+    ) {
+      hotel.appLevel =
+        req.body.appLevel;
+    }
+
+    if (
+      req.body.publicDisplayEnabled !== undefined
+    ) {
+      hotel.publicDisplayEnabled =
+        req.body.publicDisplayEnabled === true ||
+        req.body.publicDisplayEnabled === "true";
+    }
+
+    if (
+      req.body.godModeEnabled !== undefined
+    ) {
+      hotel.godModeEnabled =
+        req.body.godModeEnabled === true ||
+        req.body.godModeEnabled === "true";
+    }
+
+    if (
+      req.body.staffCapabilities !== undefined
+    ) {
+      hotel.staffCapabilities =
+        req.body.staffCapabilities;
+    }
+
+    // =========================
+    // SAVE
+    // =========================
 
     await hotel.save();
 
     return res.status(200).json({
       success: true,
-      message: "Profile updated successfully",
+      message: "Hotel settings updated successfully",
       hotel,
     });
 
   } catch (err) {
-
-    console.error(err);
+    console.error(
+      "UPDATE HOTEL PROFILE ERROR:",
+      err
+    );
 
     return res.status(500).json({
       success: false,
-      message: err.message,
+      message:
+        err.message ||
+        "Failed to update hotel profile",
     });
-
   }
 };
 /* =========================================================
