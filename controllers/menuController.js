@@ -315,193 +315,68 @@ export const deleteCategory = async (req, res) => {
 /* =====================================================
    ADD DISH
 ===================================================== */
-
 export const addDish = async (req, res) => {
   try {
-    const hotelId = getHotelId(req);
-
-    if (!hotelId) {
-      return res.status(400).json({
-        message: "Hotel not assigned to this account",
-      });
-    }
-
-    if (!isValidObjectId(hotelId)) {
-      return res.status(400).json({
-        message: "Invalid hotel ID",
-      });
-    }
-
-    const categoryId = String(
-      req.body.categoryId || ""
-    ).trim();
-
-    console.log("ADD DISH:", {
-      hotelId,
-      categoryId,
-      name: req.body.name,
-    });
-
-    if (!categoryId) {
-      return res.status(400).json({
-        message: "Category is required",
-      });
-    }
-
-    if (!isValidObjectId(categoryId)) {
-      return res.status(400).json({
-        message: "Invalid category ID",
-      });
-    }
-
-    const category = await MenuCategory.findOne({
-      _id: categoryId,
-      hotelId,
-      isActive: true,
-    });
-
-    if (!category) {
-      return res.status(400).json({
-        message:
-          "Invalid category. Please select an active category belonging to this hotel.",
-      });
-    }
-
-    const name = String(req.body.name || "").trim();
-
-    if (!name) {
-      return res.status(400).json({
-        message: "Dish name is required",
-      });
-    }
-
-    const price = Number(req.body.price);
-
-    if (!Number.isFinite(price) || price < 0) {
-      return res.status(400).json({
-        message: "Invalid dish price",
-      });
-    }
-
-    const subCategory = String(
-      req.body.subCategory || ""
-    ).trim();
+    const gst =
+      req.body.gst !== undefined &&
+      req.body.gst !== ""
+        ? Number(req.body.gst)
+        : null;
 
     if (
-      subCategory &&
-      category.subCategories.length > 0 &&
-      !category.subCategories.includes(subCategory)
+      gst !== null &&
+      (!Number.isFinite(gst) ||
+        gst < 0 ||
+        gst > 100)
     ) {
       return res.status(400).json({
-        message: "Invalid subcategory",
+        message: "GST must be between 0 and 100",
       });
-    }
-
-    let image = "";
-
-    if (req.file) {
-      const result = await uploadToCloudinary(
-        req.file.buffer,
-        "menu"
-      );
-
-      image = result.secure_url;
     }
 
     const dish = await Menu.create({
-      hotelId,
+      hotelId: req.user.hotelId,
 
-      categoryId,
+      name: req.body.name,
+      description: req.body.description,
+      category: req.body.category,
 
-      subCategory,
+      foodType: req.body.foodType,
+      containsEgg: req.body.containsEgg,
 
-      name,
+      price: Number(req.body.price || 0),
 
-      description: String(
-        req.body.description || ""
-      ),
+      discountType: req.body.discountType,
+      discountValue: Number(req.body.discountValue || 0),
 
-      price,
+      prepTime: Number(req.body.prepTime || 0),
 
-      prepTime:
-        Number(req.body.prepTime) || 15,
+      isAvailable: req.body.isAvailable,
+      isRecommended: req.body.isRecommended,
+      isBestseller: req.body.isBestseller,
+      featured: req.body.featured,
+      todaySpecial: req.body.todaySpecial,
+      isPopular: req.body.isPopular,
+      isNewArrival: req.body.isNewArrival,
+      chefChoice: req.body.chefChoice,
 
-      foodType:
-        req.body.foodType === "nonveg"
-          ? "nonveg"
-          : "veg",
+      spiceLevel: req.body.spiceLevel,
+      displayOrder: Number(req.body.displayOrder || 0),
 
-      image,
-
-      isAvailable: toBoolean(
-        req.body.isAvailable,
-        true
-      ),
-
-      isRecommended: toBoolean(
-        req.body.isRecommended
-      ),
-
-      isBestseller: toBoolean(
-        req.body.isBestseller
-      ),
-
-      featured: toBoolean(
-        req.body.featured
-      ),
-
-      todaySpecial: toBoolean(
-        req.body.todaySpecial
-      ),
-
-      isPopular: toBoolean(
-        req.body.isPopular
-      ),
-
-      isNewArrival: toBoolean(
-        req.body.isNewArrival
-      ),
-
-      chefChoice: toBoolean(
-        req.body.chefChoice
-      ),
-
-      spiceLevel:
-        req.body.spiceLevel || "",
-
-      tags: cleanTags(req.body.tags),
-
-      gst:
-        req.body.gst !== undefined &&
-        req.body.gst !== ""
-          ? Number(req.body.gst)
-          : null,
-
-      displayOrder:
-        Number(req.body.displayOrder) || 0,
-
-      isScheduled: Boolean(
-        req.body.scheduledFor
-      ),
-
-      scheduledFor:
-        req.body.scheduledFor || null,
+      // IMPORTANT
+      gst,
     });
-
-    const populatedDish =
-      await Menu.findById(dish._id).populate(
-        populateCategory
-      );
 
     return res.status(201).json({
       success: true,
-      dish: populatedDish,
+      message: "Dish created successfully",
+      dish,
     });
   } catch (error) {
     console.error("ADD DISH ERROR:", error);
 
     return res.status(500).json({
-      message: error.message,
+      message: error.message || "Failed to create dish",
     });
   }
 };
@@ -657,6 +532,25 @@ export const updateDish = async (req, res) => {
           ? "nonveg"
           : "veg";
     }
+    if (req.body.gst !== undefined) {
+  if (req.body.gst === "") {
+    updateData.gst = null;
+  } else {
+    const gst = Number(req.body.gst);
+
+    if (
+      !Number.isFinite(gst) ||
+      gst < 0 ||
+      gst > 100
+    ) {
+      return res.status(400).json({
+        message: "GST must be between 0 and 100",
+      });
+    }
+
+    updateData.gst = gst;
+  }
+}
 
     const booleanFields = [
       "isAvailable",

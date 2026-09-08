@@ -110,7 +110,9 @@ const menuSchema = new mongoose.Schema(
     gst: {
       type: Number,
       default: null,
-      min: 0,
+      min: 0, 
+      max: 100,
+      
     },
 
     displayOrder: {
