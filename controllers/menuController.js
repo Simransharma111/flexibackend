@@ -315,8 +315,66 @@ export const deleteCategory = async (req, res) => {
 /* =====================================================
    ADD DISH
 ===================================================== */
+/* =====================================================
+   ADD DISH
+===================================================== */
+
 export const addDish = async (req, res) => {
   try {
+    const hotelId = getHotelId(req);
+
+    if (!hotelId) {
+      return res.status(400).json({
+        message: "Hotel not assigned to this account",
+      });
+    }
+
+    if (!isValidObjectId(hotelId)) {
+      return res.status(400).json({
+        message: "Invalid hotel ID",
+      });
+    }
+
+    // -------------------------------------------------
+    // CATEGORY ID
+    // -------------------------------------------------
+
+    const categoryId = String(
+      req.body.categoryId || ""
+    ).trim();
+
+    if (!categoryId) {
+      return res.status(400).json({
+        message: "Category ID is required",
+      });
+    }
+
+    if (!isValidObjectId(categoryId)) {
+      return res.status(400).json({
+        message: "Invalid category ID",
+      });
+    }
+
+    // -------------------------------------------------
+    // VERIFY CATEGORY BELONGS TO THIS HOTEL
+    // -------------------------------------------------
+
+    const category = await MenuCategory.findOne({
+      _id: categoryId,
+      hotelId,
+      isActive: true,
+    });
+
+    if (!category) {
+      return res.status(400).json({
+        message: "Invalid category for this hotel",
+      });
+    }
+
+    // -------------------------------------------------
+    // GST
+    // -------------------------------------------------
+
     const gst =
       req.body.gst !== undefined &&
       req.body.gst !== ""
@@ -334,49 +392,145 @@ export const addDish = async (req, res) => {
       });
     }
 
+    // -------------------------------------------------
+    // SUBCATEGORY
+    // -------------------------------------------------
+
+    const subCategory = String(
+      req.body.subCategory || ""
+    ).trim();
+
+    if (
+      subCategory &&
+      Array.isArray(category.subCategories) &&
+      category.subCategories.length > 0 &&
+      !category.subCategories.includes(subCategory)
+    ) {
+      return res.status(400).json({
+        message: "Invalid subcategory",
+      });
+    }
+
+    // -------------------------------------------------
+    // CREATE DISH
+    // -------------------------------------------------
+
     const dish = await Menu.create({
-      hotelId: req.user.hotelId,
+      hotelId,
+
+      // IMPORTANT:
+      // Menu schema requires categoryId
+      categoryId,
+
+      // Keep category only if your frontend/cache uses it.
+      // It is NOT the MongoDB relationship field.
+      category: category.name,
+
+      subCategory,
 
       name: req.body.name,
-      description: req.body.description,
-      category: req.body.category,
+      description: req.body.description || "",
 
-      foodType: req.body.foodType,
-      containsEgg: req.body.containsEgg,
+      foodType:
+        req.body.foodType === "nonveg"
+          ? "nonveg"
+          : "veg",
+
+      containsEgg: toBoolean(
+        req.body.containsEgg,
+        false
+      ),
 
       price: Number(req.body.price || 0),
 
-      discountType: req.body.discountType,
-      discountValue: Number(req.body.discountValue || 0),
+      discountType: req.body.discountType || "",
+      discountValue: Number(
+        req.body.discountValue || 0
+      ),
 
-      prepTime: Number(req.body.prepTime || 0),
+      prepTime: Number(
+        req.body.prepTime || 15
+      ),
 
-      isAvailable: req.body.isAvailable,
-      isRecommended: req.body.isRecommended,
-      isBestseller: req.body.isBestseller,
-      featured: req.body.featured,
-      todaySpecial: req.body.todaySpecial,
-      isPopular: req.body.isPopular,
-      isNewArrival: req.body.isNewArrival,
-      chefChoice: req.body.chefChoice,
+      isAvailable: toBoolean(
+        req.body.isAvailable,
+        true
+      ),
 
-      spiceLevel: req.body.spiceLevel,
-      displayOrder: Number(req.body.displayOrder || 0),
+      isRecommended: toBoolean(
+        req.body.isRecommended,
+        false
+      ),
 
-      // IMPORTANT
+      isBestseller: toBoolean(
+        req.body.isBestseller,
+        false
+      ),
+
+      featured: toBoolean(
+        req.body.featured,
+        false
+      ),
+
+      todaySpecial: toBoolean(
+        req.body.todaySpecial,
+        false
+      ),
+
+      isPopular: toBoolean(
+        req.body.isPopular,
+        false
+      ),
+
+      isNewArrival: toBoolean(
+        req.body.isNewArrival,
+        false
+      ),
+
+      chefChoice: toBoolean(
+        req.body.chefChoice,
+        false
+      ),
+
+      spiceLevel:
+        req.body.spiceLevel || "",
+
+      tags: cleanTags(req.body.tags),
+
+      displayOrder: Number(
+        req.body.displayOrder || 0
+      ),
+
+      // GST:
+      // null = use hotel GST
+      // 0    = explicitly 0%
+      // 5    = 5%
+      // 12   = 12%
+      // 18   = 18%
       gst,
     });
+
+    // -------------------------------------------------
+    // RETURN POPULATED DISH
+    // -------------------------------------------------
+
+    const populatedDish =
+      await Menu.findById(dish._id).populate(
+        populateCategory
+      );
 
     return res.status(201).json({
       success: true,
       message: "Dish created successfully",
-      dish,
+      dish: populatedDish,
     });
   } catch (error) {
     console.error("ADD DISH ERROR:", error);
 
     return res.status(500).json({
-      message: error.message || "Failed to create dish",
+      message:
+        error.message ||
+        "Failed to create dish",
     });
   }
 };
