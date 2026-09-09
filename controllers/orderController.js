@@ -3,9 +3,12 @@ import mongoose from "mongoose";
 import Order from "../models/Order.js";
 import Menu from "../models/Menu.js";
 import Table from "../models/Table.js";
+import Hotel from "../models/Hotel.js";
 import admin from "../utils/firebase.js";
 import User from "../models/User.js";
 import { io } from "../server.js";
+import { validateComboSelections } from "../utils/combo.js";
+import { calculateGST, getEffectiveGstRate } from "../utils/calculateGST.js";
 
 /* =========================================
    CREATE ORDER
@@ -59,6 +62,8 @@ export const createOrder = async (req, res) => {
       });
     }
 
+    const hotel = await Hotel.findById(table.hotelId);
+
     // ---------------------------------------
     // SCHEDULE VALIDATION
     // ---------------------------------------
@@ -100,6 +105,7 @@ export const createOrder = async (req, res) => {
     // ---------------------------------------
 
     let subtotal = 0;
+    let gstAmount = 0;
     let estimatedTime = 0;
 
     const orderItems = [];
@@ -109,10 +115,14 @@ export const createOrder = async (req, res) => {
         continue;
       }
 
-      const menuItem = await Menu.findById(item.menuId);
+      const menuItem = await Menu.findOne({
+        _id: item.menuId,
+        hotelId: table.hotelId,
+        isDeleted: false,
+      });
 
       if (!menuItem) {
-        continue;
+        return res.status(400).json({ success: false, message: "One or more menu items are invalid" });
       }
 
       const quantity = Number(item.quantity);
@@ -124,7 +134,27 @@ export const createOrder = async (req, res) => {
       const itemTotal =
         Number(menuItem.price) * quantity;
 
+      const itemType = menuItem.menuType === "combo" ? "combo" : "simple";
+      if (itemType === "combo" && menuItem.isAvailable === false) {
+        return res.status(400).json({ success: false, message: `${menuItem.name} is no longer available` });
+      }
+      let comboSelections;
+      if (itemType === "combo") {
+        try {
+          comboSelections = validateComboSelections(menuItem.comboConfig, item.comboSelections);
+        } catch (validationError) {
+          return res.status(400).json({
+            success: false,
+            message: validationError.message,
+          });
+        }
+      }
+
       subtotal += itemTotal;
+      gstAmount += calculateGST({
+        amount: itemTotal,
+        rate: getEffectiveGstRate(menuItem, hotel),
+      });
 
       estimatedTime +=
         Number(menuItem.prepTime || 10) * quantity;
@@ -135,6 +165,11 @@ export const createOrder = async (req, res) => {
         quantity,
         price: Number(menuItem.price),
         total: itemTotal,
+        itemType,
+        ...(itemType === "combo" ? {
+          comboIncludedItems: menuItem.comboConfig?.includedItems || [],
+          comboSelections,
+        } : {}),
       });
     }
 
@@ -152,8 +187,6 @@ export const createOrder = async (req, res) => {
     // ---------------------------------------
     // BILLING
     // ---------------------------------------
-
-    const gstAmount = subtotal * 0.05;
 
     const serviceCharge = subtotal * 0.02;
 

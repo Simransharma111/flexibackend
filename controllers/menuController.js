@@ -3,6 +3,7 @@ import Menu from "../models/Menu.js";
 import mongoose from "mongoose";
 import Table from "../models/Table.js";
 import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
+import { validateComboConfig } from "../utils/combo.js";
 
 const isValidObjectId = (value) =>
   mongoose.Types.ObjectId.isValid(value);
@@ -33,6 +34,36 @@ const cleanTags = (tags) => {
         .filter(Boolean)
     ),
   ];
+};
+
+const readComboFields = (body, existing = null) => {
+  const menuType = body.menuType === undefined
+    ? (existing?.menuType || "simple")
+    : String(body.menuType).trim().toLowerCase();
+
+  if (!["simple", "combo"].includes(menuType)) {
+    throw new Error("Menu type must be simple or combo");
+  }
+
+  if (menuType === "simple") {
+    return { menuType, comboConfig: undefined };
+  }
+
+  let rawConfig = body.comboConfig === undefined
+    ? existing?.comboConfig
+    : body.comboConfig;
+  if (typeof rawConfig === "string") {
+    try {
+      rawConfig = JSON.parse(rawConfig);
+    } catch {
+      throw new Error("Combo configuration must be valid JSON");
+    }
+  }
+
+  return {
+    menuType,
+    comboConfig: validateComboConfig(rawConfig),
+  };
 };
 
 const getHotelId = (req) => {
@@ -371,6 +402,8 @@ export const addDish = async (req, res) => {
       });
     }
 
+    const comboFields = readComboFields(req.body);
+
     // -------------------------------------------------
     // GST
     // -------------------------------------------------
@@ -508,6 +541,8 @@ export const addDish = async (req, res) => {
       // 12   = 12%
       // 18   = 18%
       gst,
+
+      ...comboFields,
     });
 
     // -------------------------------------------------
@@ -527,7 +562,8 @@ export const addDish = async (req, res) => {
   } catch (error) {
     console.error("ADD DISH ERROR:", error);
 
-    return res.status(500).json({
+    const status = /menu type|combo configuration|included item|selection group|selection option|option names/i.test(error.message || "") ? 400 : 500;
+    return res.status(status).json({
       message:
         error.message ||
         "Failed to create dish",
@@ -626,8 +662,11 @@ export const updateDish = async (req, res) => {
       });
     }
 
+    const comboFields = readComboFields(req.body, dish);
+
     const updateData = {
       categoryId,
+      ...comboFields,
       subCategory:
         req.body.subCategory !== undefined
           ? String(req.body.subCategory).trim()
@@ -787,7 +826,8 @@ export const updateDish = async (req, res) => {
   } catch (error) {
     console.error("UPDATE DISH ERROR:", error);
 
-    return res.status(500).json({
+    const status = /menu type|combo configuration|included item|selection group|selection option|option names/i.test(error.message || "") ? 400 : 500;
+    return res.status(status).json({
       message: error.message,
     });
   }

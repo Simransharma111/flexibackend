@@ -44,6 +44,28 @@ const menuSchema = new mongoose.Schema(
       min: 0,
     },
 
+    menuType: {
+      type: String,
+      enum: ["simple", "combo"],
+      default: "simple",
+    },
+
+    comboConfig: {
+      includedItems: {
+        type: [String],
+        default: undefined,
+      },
+      selectionGroups: {
+        type: [{
+          name: { type: String, trim: true },
+          minSelections: { type: Number, min: 0 },
+          maxSelections: { type: Number, min: 0 },
+          items: { type: [String], default: undefined },
+        }],
+        default: undefined,
+      },
+    },
+
     prepTime: {
       type: Number,
       default: 15,

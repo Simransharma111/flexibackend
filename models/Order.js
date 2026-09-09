@@ -82,7 +82,23 @@ const orderSchema = new mongoose.Schema(
       total:{
         type:Number,
         default:0,
-      }
+      },
+
+      itemType: {
+        type: String,
+        enum: ["simple", "combo"],
+        default: "simple",
+      },
+
+      comboIncludedItems: {
+        type: [String],
+        default: undefined,
+      },
+
+      comboSelections: [{
+        groupName: String,
+        items: [String],
+      }]
 
     }
 
