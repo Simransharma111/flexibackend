@@ -295,7 +295,7 @@ export const createOrder = async (req, res) => {
             priority: "high",
 
             notification: {
-              sound: "default",
+              sound: "orders_received",
             },
           },
         }));

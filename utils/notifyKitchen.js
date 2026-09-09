@@ -69,6 +69,13 @@ export const notifyKitchen =
 
           },
 
+          android: {
+            priority: "high",
+            notification: {
+              sound: "orders_received",
+            },
+          },
+
         });
 
       console.log(
