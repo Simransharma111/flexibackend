@@ -2,19 +2,34 @@ const normalizeText = (value) => String(value ?? "").trim();
 
 const duplicateKey = (value) => normalizeText(value).toLocaleLowerCase();
 
+const normalizeNames = (value) => {
+  if (Array.isArray(value)) return value.flatMap(normalizeNames);
+  if (value && typeof value === "object") return normalizeNames(value.name ?? "");
+
+  const text = normalizeText(value);
+  if (!text) return [];
+
+  if (text.startsWith("[") || text.startsWith("{")) {
+    try {
+      return normalizeNames(JSON.parse(text));
+    } catch {
+      const names = [...text.matchAll(/name\s*:\s*['"]([^'"]+)['"]/g)].map((match) => match[1].trim()).filter(Boolean);
+      return names.length ? names : [text];
+    }
+  }
+
+  return [text];
+};
+
 export const normalizeComboConfig = (config) => {
   const source = config && typeof config === "object" ? config : {};
-  const includedItems = Array.isArray(source.includedItems)
-    ? source.includedItems.map((item) => normalizeText(item?.name ?? item)).filter(Boolean)
-    : [];
+  const includedItems = normalizeNames(source.includedItems);
   const selectionGroups = Array.isArray(source.selectionGroups)
     ? source.selectionGroups.map((group) => ({
         name: normalizeText(group?.name),
         minSelections: Number(group?.minSelections ?? 0),
         maxSelections: Number(group?.maxSelections ?? 0),
-        items: Array.isArray(group?.items)
-          ? group.items.map((item) => ({ name: normalizeText(item?.name ?? item) })).filter((item) => item.name)
-          : [],
+        items: normalizeNames(group?.items),
       }))
     : [];
 
@@ -44,8 +59,8 @@ export const validateComboConfig = (config) => {
     }
     const optionNames = new Set();
     group.items.forEach((item) => {
-      if (!item.name) throw new Error("Selection option name is required.");
-      const key = duplicateKey(item.name);
+      if (!item) throw new Error("Selection option name is required.");
+      const key = duplicateKey(item);
       if (optionNames.has(key)) throw new Error("Selection option names must be unique within a group.");
       optionNames.add(key);
     });
@@ -67,7 +82,7 @@ export const validateComboSelections = (config, selections) => {
     if (!group || seenGroups.has(duplicateKey(groupName))) throw new Error("Invalid combo selection group.");
     seenGroups.add(duplicateKey(groupName));
     const values = Array.isArray(selection?.items) ? selection.items.map(normalizeText) : [];
-    const allowed = new Map(group.items.map((item) => [duplicateKey(item.name), item.name]));
+    const allowed = new Map(group.items.map((item) => [duplicateKey(item), item]));
     const unique = new Set();
     const items = values.map((value) => {
       const key = duplicateKey(value);
