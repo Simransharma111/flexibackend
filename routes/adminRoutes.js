@@ -5,7 +5,8 @@ import {
   getAllHotels,
   activateHotel,
   deactivateHotel,
-  deleteHotel,resetUserPassword
+  deleteHotel,resetUserPassword, getHotelStaff,
+  extendSubscription,
 } from "../controllers/adminController.js";
 
 import auth from "../middlewares/auth.js";
@@ -72,6 +73,14 @@ router.post(
   auth,
   authorizeRoles("superadmin"),
   resetUserPassword
+);
+router.get(
+  "/hotels/:hotelId/staff",
+  getHotelStaff
+);
+router.put(
+  "/hotels/:id/subscription",
+  extendSubscription
 );
 
 export default router;
