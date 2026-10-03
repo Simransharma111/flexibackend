@@ -16,6 +16,7 @@ export const createHotelWithOwner = async (req, res) => {
       ownerName,
       ownerEmail,
       ownerPassword,
+       subscriptionPlan,
     } = req.body;
 
     // -------------------------------------------------
@@ -38,53 +39,61 @@ export const createHotelWithOwner = async (req, res) => {
       .trim()
       .toLowerCase();
 
+  // -------------------------------------------------
+// SUBSCRIPTION
+// -------------------------------------------------
+
+const validPlans = [
+  "trial",
+  "basic",
+  "premium",
+];
+
+const plan =
+  validPlans.includes(subscriptionPlan)
+    ? subscriptionPlan
+    : "trial";
+
+const planDurations = {
+  trial: 14,
+  basic: 30,
+  premium: 30,
+};
+
+const subscriptionStartedAt = new Date();
+
+const subscriptionExpiresAt =
+  new Date(subscriptionStartedAt);
+
+subscriptionExpiresAt.setDate(
+  subscriptionExpiresAt.getDate() +
+    planDurations[plan]
+);
+
     // -------------------------------------------------
     // CHECK EXISTING OWNER
     // -------------------------------------------------
 
-    const existingUser = await User.findOne({
-      email: cleanEmail,
-    });
+   const owner = await User.create({
+  name: ownerName.trim(),
+  email: cleanEmail,
+  password: hashedPassword,
 
-    if (existingUser) {
-      return res.status(409).json({
-        success: false,
-        message: "An account with this email already exists",
-      });
-    }
+  role: "owner",
 
-    // -------------------------------------------------
-    // HASH PASSWORD
-    // -------------------------------------------------
+  subscriptionPlan: plan,
 
-    const hashedPassword = await bcrypt.hash(
-      ownerPassword,
-      10
-    );
+  subscriptionStartedAt,
+  subscriptionExpiresAt,
 
-    // -------------------------------------------------
-    // CREATE OWNER
-    // -------------------------------------------------
+  mustChangePassword: true,
 
-    const owner = await User.create({
-      name: ownerName.trim(),
-      email: cleanEmail,
-      password: hashedPassword,
+  accountStatus: "active",
 
-      role: "owner",
+  createdBy: "admin",
 
-      // Admin-created owner must change password
-      mustChangePassword: true,
-
-      accountStatus: "active",
-
-      // This is an admin-created account
-      createdBy: "admin",
-
-      // Hotel is linked immediately after creation
-      hotelId: null,
-    });
-
+  hotelId: null,
+});
     // -------------------------------------------------
     // CREATE HOTEL
     // -------------------------------------------------
@@ -143,15 +152,21 @@ export const createHotelWithOwner = async (req, res) => {
 
       hotel: populatedHotel,
 
-      owner: {
-        id: owner._id,
-        name: owner.name,
-        email: owner.email,
-        role: owner.role,
-        hotelId: owner.hotelId,
-        accountStatus: owner.accountStatus,
-        mustChangePassword: owner.mustChangePassword,
-      },
+     owner: {
+  id: owner._id,
+  name: owner.name,
+  email: owner.email,
+  role: owner.role,
+  hotelId: owner.hotelId,
+  accountStatus: owner.accountStatus,
+  mustChangePassword: owner.mustChangePassword,
+
+  subscriptionPlan: owner.subscriptionPlan,
+  subscriptionStartedAt:
+    owner.subscriptionStartedAt,
+  subscriptionExpiresAt:
+    owner.subscriptionExpiresAt,
+},
     });
 
   } catch (err) {

@@ -61,6 +61,15 @@ const userSchema = new mongoose.Schema(
       ],
       default: "trial",
     },
+    subscriptionStartedAt: {
+  type: Date,
+  default: null,
+},
+
+subscriptionExpiresAt: {
+  type: Date,
+  default: null,
+},
 
     createdBy: {
       type: String,
