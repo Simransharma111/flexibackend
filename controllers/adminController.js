@@ -333,14 +333,22 @@ export const deactivateHotel = async (
 // DELETE HOTEL
 // =====================================================
 
-export const deleteHotel = async (
-  req,
-  res
-) => {
+// =====================================================
+// DELETE HOTEL + OWNER + STAFF
+// =====================================================
+
+export const deleteHotel = async (req, res) => {
   try {
-    const hotel = await Hotel.findById(
-      req.params.id
-    );
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid hotel ID",
+      });
+    }
+
+    const hotel = await Hotel.findById(id);
 
     if (!hotel) {
       return res.status(404).json({
@@ -349,35 +357,49 @@ export const deleteHotel = async (
       });
     }
 
-    // Delete owner
-    if (hotel.owner) {
-      await User.findByIdAndDelete(
-        hotel.owner
-      );
-    }
+    // -------------------------------------------------
+    // DELETE ALL USERS BELONGING TO THIS HOTEL
+    // -------------------------------------------------
+    //
+    // This includes:
+    // - Owner
+    // - Staff
+    //
+    // It does NOT delete superadmins because a superadmin
+    // should never have a hotelId.
+    //
+    const deletedUsers = await User.deleteMany({
+      hotelId: hotel._id,
+      role: {
+        $in: ["owner", "staff"],
+      },
+    });
 
-    // Delete hotel
-    await Hotel.findByIdAndDelete(
-      hotel._id
-    );
+    // -------------------------------------------------
+    // DELETE HOTEL
+    // -------------------------------------------------
+
+    await Hotel.findByIdAndDelete(hotel._id);
+
+    // -------------------------------------------------
+    // RESPONSE
+    // -------------------------------------------------
 
     return res.status(200).json({
       success: true,
-      message:
-        "Hotel and owner deleted successfully",
-    });
+      message: "Hotel, owner, and staff deleted successfully",
 
+      deleted: {
+        hotel: 1,
+        users: deletedUsers.deletedCount || 0,
+      },
+    });
   } catch (err) {
-    console.error(
-      "DELETE HOTEL ERROR:",
-      err
-    );
+    console.error("DELETE HOTEL ERROR:", err);
 
     return res.status(500).json({
       success: false,
-      message:
-        err.message ||
-        "Failed to delete hotel",
+      message: err.message || "Failed to delete hotel",
     });
   }
 };
