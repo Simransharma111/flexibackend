@@ -79,7 +79,11 @@ subscriptionExpiresAt: {
       ],
       default: "self",
     },
-
+createdByUser: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "User",
+  default: null,
+},
     // FORCE PASSWORD CHANGE
     mustChangePassword: {
       type: Boolean,
