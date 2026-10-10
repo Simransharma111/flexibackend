@@ -2,7 +2,7 @@ import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import transporter from "../config/mail.js";
+import sendEmail from "../config/mail.js";
 
 // =====================================================
 // SELF REGISTER OWNER
@@ -715,7 +715,13 @@ FlexiOrder Team
       `,
     };
 
-    await transporter.sendMail(mailOptions);
+    await sendEmail({
+  from: process.env.EMAIL_FROM,
+  to: user.email,
+  subject: mailOptions.subject,
+  text: mailOptions.text,
+  html: mailOptions.html,
+});
 
     return res.status(200).json({
       success: true,
