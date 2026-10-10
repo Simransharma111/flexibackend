@@ -528,10 +528,10 @@ export const changePassword = async (
 // =====================================================
 
 export const forgotPassword = async (req, res) => {
+  let email;
+
   try {
-    const email = req.body?.email
-      ?.trim()
-      .toLowerCase();
+    email = req.body?.email?.trim().toLowerCase();
 
     if (!email) {
       return res.status(400).json({
@@ -540,57 +540,23 @@ export const forgotPassword = async (req, res) => {
       });
     }
 
-    const user = await User.findOne({
-      email,
-    });
+    const user = await User.findOne({ email });
 
-    /*
-     * Always return the same response whether the
-     * account exists or not.
-     *
-     * This prevents people from discovering which
-     * email addresses have accounts.
-     */
-
-    if (!user) {
-      return res.status(200).json({
-        success: true,
-        message:
-          "If an account exists with this email, a password reset link has been sent.",
-      });
-    }
-
-    /*
-     * Only owner and staff should use this
-     * password recovery flow.
-     *
-     * Super Admin recovery will be handled
-     * separately.
-     */
+    const genericMessage =
+      "If an account exists with this email, a password reset link has been sent.";
 
     if (
-      user.role !== "owner" &&
-      user.role !== "staff"
+      !user ||
+      (user.role !== "owner" && user.role !== "staff")
     ) {
       return res.status(200).json({
         success: true,
-        message:
-          "If an account exists with this email, a password reset link has been sent.",
+        message: genericMessage,
       });
     }
 
-    // =================================================
-    // GENERATE SECURE RESET TOKEN
-    // =================================================
-
-    const resetToken =
-      crypto.randomBytes(32).toString("hex");
-
-    /*
-     * Store only the hash in MongoDB.
-     *
-     * The actual token is sent through email.
-     */
+    // Generate a secure token and store only its hash.
+    const resetToken = crypto.randomBytes(32).toString("hex");
 
     const hashedToken = crypto
       .createHash("sha256")
@@ -598,157 +564,81 @@ export const forgotPassword = async (req, res) => {
       .digest("hex");
 
     user.resetPasswordToken = hashedToken;
-
-    /*
-     * Reset link will remain valid for 15 minutes.
-     */
-
-    user.resetPasswordExpires =
-      new Date(Date.now() + 15 * 60 * 1000);
+    user.resetPasswordExpires = new Date(
+      Date.now() + 15 * 60 * 1000
+    );
 
     await user.save();
 
-    // =================================================
-    // FRONTEND RESET URL
-    // =================================================
-
-    const frontendUrl =
-      process.env.FRONTEND_URL ||
-      "http://localhost:5173";
+    const frontendUrl = (
+      process.env.FRONTEND_URL || "http://localhost:5173"
+    ).replace(/\/+$/, "");
 
     const resetUrl =
       `${frontendUrl}/reset-password/${resetToken}`;
 
-    // =================================================
-    // EMAIL
-    // =================================================
+    const safeName = String(user.name || "there")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
 
-    const mailOptions = {
-      from:
-        process.env.EMAIL_FROM ||
-        process.env.EMAIL_USER,
-
+    await sendEmail({
+      from: process.env.EMAIL_FROM,
       to: user.email,
-
-      subject:
-        "FlexiOrder - Reset Your Password",
-
+      subject: "FlexiOrder - Reset Your Password",
       text: `
 Hello ${user.name || "there"},
 
 We received a request to reset your FlexiOrder password.
 
-Use the following link to create a new password:
-
+Use this link to create a new password:
 ${resetUrl}
 
-This link will expire in 15 minutes.
-
-If you did not request a password reset, you can safely ignore this email.
+This link expires in 15 minutes. If you did not request a reset, ignore this email.
 
 Regards,
 FlexiOrder Team
       `.trim(),
-
       html: `
-        <div style="
-          font-family: Arial, sans-serif;
-          max-width: 600px;
-          margin: 0 auto;
-          padding: 30px;
-          color: #1f2937;
-        ">
-
-          <h2 style="margin-bottom: 10px;">
-            Reset Your FlexiOrder Password
-          </h2>
-
-          <p>
-            Hello ${user.name || "there"},
-          </p>
-
-          <p>
-            We received a request to reset your FlexiOrder password.
-          </p>
-
-          <p style="margin: 30px 0;">
-            <a
-              href="${resetUrl}"
-              style="
-                display: inline-block;
-                padding: 12px 22px;
-                background: #2563eb;
-                color: #ffffff;
-                text-decoration: none;
-                border-radius: 8px;
-                font-weight: bold;
-              "
-            >
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:30px;color:#1f2937">
+          <h2>Reset Your FlexiOrder Password</h2>
+          <p>Hello ${safeName},</p>
+          <p>We received a request to reset your FlexiOrder password.</p>
+          <p style="margin:30px 0">
+            <a href="${resetUrl}" style="display:inline-block;padding:12px 22px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold">
               Reset Password
             </a>
           </p>
-
-          <p>
-            This password reset link will expire in
-            <strong>15 minutes</strong>.
-          </p>
-
-          <p>
-            If you did not request a password reset,
-            you can safely ignore this email.
-          </p>
-
-          <hr style="
-            margin: 30px 0;
-            border: 0;
-            border-top: 1px solid #e5e7eb;
-          ">
-
-          <p style="
-            font-size: 12px;
-            color: #6b7280;
-          ">
-            FlexiOrder
-          </p>
-
+          <p>This link expires in <strong>15 minutes</strong>.</p>
+          <p>If you did not request a password reset, you can safely ignore this email.</p>
+          <hr style="margin:30px 0;border:0;border-top:1px solid #e5e7eb">
+          <p style="font-size:12px;color:#6b7280">FlexiOrder</p>
         </div>
       `,
-    };
-
-    await sendEmail({
-  from: process.env.EMAIL_FROM,
-  to: user.email,
-  subject: mailOptions.subject,
-  text: mailOptions.text,
-  html: mailOptions.html,
-});
+    });
 
     return res.status(200).json({
       success: true,
-      message:
-        "If an account exists with this email, a password reset link has been sent.",
+      message: genericMessage,
+    });
+  } catch (error) {
+    console.error("FORGOT PASSWORD ERROR:", {
+      name: error?.name,
+      message: error?.message,
+      statusCode: error?.statusCode,
     });
 
-  } catch (error) {
-    console.error(
-      "FORGOT PASSWORD ERROR:",
-      error
-    );
-
-    /*
-     * Remove the reset token if email sending
-     * failed so that a broken token isn't left
-     * in the database.
-     */
-
-    try {
-      const email = req.body?.email
-        ?.trim()
-        .toLowerCase();
-
-      if (email) {
+    // Clear the reset token only if email sending failed
+    // after the token was saved.
+    if (email) {
+      try {
         await User.findOneAndUpdate(
-          { email },
+          {
+            email,
+            resetPasswordToken: { $exists: true },
+          },
           {
             $unset: {
               resetPasswordToken: 1,
@@ -756,12 +646,12 @@ FlexiOrder Team
             },
           }
         );
+      } catch (cleanupError) {
+        console.error("RESET TOKEN CLEANUP ERROR:", {
+          name: cleanupError?.name,
+          message: cleanupError?.message,
+        });
       }
-    } catch (cleanupError) {
-      console.error(
-        "RESET TOKEN CLEANUP ERROR:",
-        cleanupError
-      );
     }
 
     return res.status(500).json({
