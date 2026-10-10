@@ -1,6 +1,7 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
+// import dotenv from "dotenv";
 import http from "http";
 import { Server } from "socket.io";
 import helmet from "helmet";
@@ -24,7 +25,7 @@ import notificationRoutes from "./routes/notificationRoutes.js";
 // import categoryRoutes from "./routes/categoryRoutes.js";
 import menuCategoryRoutes from "./routes/menuCategoryRoutes.js";
 
-dotenv.config();
+// dotenv.config();
 
 
 const app = express();

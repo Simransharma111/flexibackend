@@ -1,5 +1,8 @@
 import nodemailer from "nodemailer";
-
+console.log("SMTP diagnostic:", {
+  emailUserLoaded: Boolean(process.env.EMAIL_USER),
+  emailPasswordLoaded: Boolean(process.env.EMAIL_PASSWORD),
+});
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 465,

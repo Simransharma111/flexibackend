@@ -3,7 +3,8 @@ import express from "express";
 import {
 register,
 login,
-changePassword
+changePassword,
+forgotPassword, resetPassword,
 }
 from "../controllers/authController.js";
 import auth from "../middlewares/auth.js";
@@ -34,14 +35,14 @@ changePassword
 
 
 
-// router.post(
-// "/forgot-password",
-// forgotPassword
-// );
+router.post(
+"/forgot-password",
+forgotPassword
+);
 
-// router.post(
-//   "/reset-password/:token",
-//   resetPassword
-// );
+router.post(
+  "/reset-password/:token",
+  resetPassword
+);
 
 export default router;
